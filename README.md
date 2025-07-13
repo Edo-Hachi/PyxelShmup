@@ -10,24 +10,6 @@ PyxelShmup is a 2D shooting game developed using the Python game engine "Pyxel".
 
 ---
 
-### ゲームシステム詳細 (Game System Details)
-
-- 本作は「レトロシューティング」をベースに、敵の隊列入場アニメーションやグループ行動、撃破時の状態遷移など、細かな挙動を再現しています。
-- 敵は「入場中（ENEMY_STATE_ENTERING）」「整列済み（ENEMY_STATE_FORMATION_READY）」「通常行動（ENEMY_STATE_NORMAL）」など複数の状態を持ち、状況に応じて遷移します。
-- 入場中に撃破された敵も、正しくゲーム進行・クリア判定から除外されるよう設計されています。
-- ステージクリアは「全ての敵が撃破されたとき」に自動で判定され、次のステージへ進みます。
-- 爆発エフェクトやカメラシェイク、ヒットストップなど演出も充実しています。
-
----
-
-- The game is based on classic retro shooters, featuring detailed enemy entry animations, group movement, and precise state transitions on defeat.
-- Enemies have multiple states such as "Entering" (`ENEMY_STATE_ENTERING`), "Formation Ready" (`ENEMY_STATE_FORMATION_READY`), and "Normal" (`ENEMY_STATE_NORMAL`), transitioning according to in-game events.
-- Even if enemies are destroyed during the entry phase, the game logic ensures they are properly excluded from further progression and stage clear checks.
-- Stage clear is automatically triggered when all enemies are defeated, advancing to the next stage.
-- The game also features explosion effects, camera shake, and hit-stop for a rich visual experience.
-
----
-
 ## 主な機能 (Main Features)
 - 4つの異なるステージ構成
 - 5種類の敵キャラクター

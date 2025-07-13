@@ -101,192 +101,222 @@ class Enemy:
         if self.attack_cooldown_timer > 0:
             self.attack_cooldown_timer -= 1
 
-        # 状態に応じた移動処理
+        # 状態に応じた処理を分岐
         if self.state == ENEMY_STATE_ENTERING:
-            self.entry_timer += 1
-            entry_duration = 120  # 2 seconds for the loop animation
-
-            if self.entry_timer <= entry_duration:
-                if self.entry_pattern == 1: # Left loop
-                    loop_center_x = Common.WIN_WIDTH / 4
-                    loop_center_y = Common.WIN_HEIGHT / 2
-                    radius = 40
-                    angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
-                    progress = self.entry_timer / entry_duration
-                    current_radius = progress * radius
-                    self.x = loop_center_x + math.cos(angle) * current_radius
-                    self.y = loop_center_y + math.sin(angle) * current_radius
-                elif self.entry_pattern == 2: # Right loop
-                    loop_center_x = Common.WIN_WIDTH * 3 / 4
-                    loop_center_y = Common.WIN_HEIGHT / 2
-                    radius = 40
-                    angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
-                    progress = self.entry_timer / entry_duration
-                    current_radius = progress * radius
-                    self.x = loop_center_x - math.cos(angle) * current_radius # Mirrored X
-                    self.y = loop_center_y + math.sin(angle) * current_radius
-            else:
-                # After loop, move to formation position (descending logic)
-                target_x = self.formation_x
-                target_y = self.formation_y
-
-                # Y-axis movement
-                self.y += DESCEND_SPEED
-
-                # X-axis movement
-                x_diff = target_x - self.x
-                if abs(x_diff) > 1:
-                    self.x += math.copysign(min(abs(x_diff), 2), x_diff)
-                else:
-                    self.x = target_x
-
-                # Check for arrival
-                distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-                if distance_to_formation <= FORMATION_PROXIMITY or self.y > target_y:
-                    self.x = target_x
-                    self.y = target_y
-                    self.base_x = target_x
-                    self.base_y = target_y
-                    self.state = ENEMY_STATE_FORMATION_READY
-
+            self._update_entering(move_amount_x)
         elif self.state == ENEMY_STATE_FORMATION_READY:
-            # Wait for all enemies to be ready
-            pass
-
+            self._update_formation_ready(move_amount_x)
         elif self.state == ENEMY_STATE_NORMAL:
-            # 通常状態：隊列移動（main.pyで処理される）
-            self.x += move_amount_x
-            self.base_x += move_amount_x # base_xも更新
-
+            self._update_normal(move_amount_x)
         elif self.state == ENEMY_STATE_PREPARE_ATTACK:
-            # 攻撃準備状態：隊列位置キープ＋上下プルプル身震い
-            self.attack_timer += 1
-            
-            # X座標は隊列移動に従う（main.pyで更新される）
-            # Y座標のみ上下プルプル動作
-            self.shake_phase_y += PREPARE_SHAKE_FREQUENCY_Y
-            shake_offset_y = math.sin(self.shake_phase_y) * PREPARE_SHAKE_AMPLITUDE_Y
-            self.y = self.base_y + shake_offset_y
-            self.x += move_amount_x # グループ移動を反映
-            self.base_x += move_amount_x # base_xも更新
-            
-            # 準備時間が経過したら攻撃状態に移行
-            if self.attack_timer >= PREPARE_ATTACK_DURATION:
-                self.state = ENEMY_STATE_ATTACK
-                self.attack_timer = 0  # タイマーリセット
-                
+            self._update_prepare_attack(move_amount_x)
         elif self.state == ENEMY_STATE_ATTACK:
-            # 攻撃状態：下方向移動＋フラフラ動作
-            self.attack_timer += 1
-            
-            # 下方向に移動
-            self.y += ATTACK_MOVE_SPEED
-            
-            # 左右の揺れ動作
-            self.sway_phase += ATTACK_SWAY_FREQUENCY
-            sway_offset = math.sin(self.sway_phase) * ATTACK_SWAY_AMPLITUDE
-            self.x = self.base_x + sway_offset + move_amount_x # グループ移動を反映
-            
-            # 画面下に出た場合
-            if self.y > Common.WIN_HEIGHT:
-                # 他のアクティブな敵がいるかチェック
-                other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-                
-                if not other_active_enemies:
-                    # 他に敵がいない場合は連続攻撃モードに移行
-                    self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-                else:
-                    # 他に敵がいる場合は通常の復帰処理
-                    self.state = ENEMY_STATE_RETURNING
-                
-                self.attack_timer = 0  # タイマーリセット
-                # 画面外に出た時のX座標を記録
-                self.exit_x = self.x
-                # 画面下の待機位置に移動（プレイヤーの弾が届かない位置）
-                self.y = Common.WIN_HEIGHT + 16
-                
+            self._update_attack(move_amount_x)
         elif self.state == ENEMY_STATE_RETURNING:
-            # 復帰待機状態（画面下で待機）
-            self.attack_timer += 1
-            
-            # 他のアクティブな敵がいるかチェック
-            other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-            
-            if not other_active_enemies:
-                # 他に敵がいない場合は連続攻撃モードに移行
-                self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-                self.attack_timer = 0  # タイマーリセット
-                return
-            
-            # 画面下の待機位置をキープ（プレイヤーの弾が当たらない）
-            self.y = Common.WIN_HEIGHT + 16
-            self.x = self.exit_x  # 画面外に出た時のX座標で待機
-            self.x += move_amount_x # グループ移動を反映
-            
-            # 復帰時間が経過したら上から復帰降下開始
-            if self.attack_timer >= RETURN_DELAY:
-                # 画面外に出た時のX座標で上から復帰
-                self.x = self.exit_x
-                self.y = -16  # 画面上部から開始
-                self.state = ENEMY_STATE_DESCENDING  # 復帰降下状態に移行
-                
+            self._update_returning(move_amount_x)
         elif self.state == ENEMY_STATE_DESCENDING:
-            # 復帰降下状態：元の隊列位置に向かって移動
-            
-            # 他のアクティブな敵がいるかチェック
-            other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-            
-            if not other_active_enemies:
-                # 他に敵がいない場合は連続攻撃モードに移行
-                self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-                self.attack_timer = 0  # タイマーリセット
-                return
-            
-            # 下方向に降下
-            self.y += DESCEND_SPEED
-            
-            # 現在の隊列位置（formation_x, formation_y）に向かって移動
+            self._update_descending(move_amount_x)
+        elif self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
+            self._update_continuous_attack(move_amount_x)
+
+        # 射撃処理
+        self._update_shooting()
+
+    def _update_entering(self, move_amount_x):
+        """入場アニメーション処理"""
+        self.entry_timer += 1
+        entry_duration = 120  # 2 seconds for the loop animation
+
+        if self.entry_timer <= entry_duration:
+            if self.entry_pattern == 1: # Left loop
+                loop_center_x = Common.WIN_WIDTH / 4
+                loop_center_y = Common.WIN_HEIGHT / 2
+                radius = 40
+                angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
+                progress = self.entry_timer / entry_duration
+                current_radius = progress * radius
+                self.x = loop_center_x + math.cos(angle) * current_radius
+                self.y = loop_center_y + math.sin(angle) * current_radius
+            elif self.entry_pattern == 2: # Right loop
+                loop_center_x = Common.WIN_WIDTH * 3 / 4
+                loop_center_y = Common.WIN_HEIGHT / 2
+                radius = 40
+                angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
+                progress = self.entry_timer / entry_duration
+                current_radius = progress * radius
+                self.x = loop_center_x - math.cos(angle) * current_radius # Mirrored X
+                self.y = loop_center_y + math.sin(angle) * current_radius
+        else:
+            # After loop, move to formation position (descending logic)
             target_x = self.formation_x
             target_y = self.formation_y
-            
-            # X方向の移動（隊列位置に向かって）
+
+            # Y-axis movement
+            self.y += DESCEND_SPEED
+
+            # X-axis movement
             x_diff = target_x - self.x
-            if abs(x_diff) > 1:  # まだ離れている場合
-                self.x += math.copysign(min(abs(x_diff), 2), x_diff)  # 最大2ピクセル/フレームで移動
+            if abs(x_diff) > 1:
+                self.x += math.copysign(min(abs(x_diff), 2), x_diff)
             else:
-                self.x = target_x  # 十分近づいたら正確な位置に
-            self.x += move_amount_x # グループ移動を反映
-            
-            # 隊列位置に近づいたかチェック
+                self.x = target_x
+
+            # Check for arrival
             distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-            if distance_to_formation <= FORMATION_PROXIMITY:
-                # 隊列に復帰
+            if distance_to_formation <= FORMATION_PROXIMITY or self.y > target_y:
                 self.x = target_x
                 self.y = target_y
-                self.base_x = target_x  # base_xも更新
-                self.base_y = target_y  # base_yも更新
-                self.state = ENEMY_STATE_NORMAL  # 通常状態に戻る
-                self.attack_cooldown_timer = ATTACK_COOLDOWN  # 攻撃クールダウン開始
-                
-        elif self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
-            # 連続攻撃モード：最後の敵が永続的に攻撃を続ける
-            self.attack_timer += 1
-            
-            # 画面下の待機位置をキープ（短い時間）
-            self.y = Common.WIN_HEIGHT + 16
-            self.x = self.exit_x  # 画面外に出た時のX座標で待機
-            self.x += move_amount_x # グループ移動を反映
-            
-            # 短い復帰時間が経過したら再び攻撃開始
-            if self.attack_timer >= RETURN_DELAY_CONTINUOUS:
-                # ランダムなX座標で上から再出現
-                self.x = random.randint(8, Common.WIN_WIDTH - 16)
-                self.y = -16  # 画面上部から開始
-                self.state = ENEMY_STATE_ATTACK  # 攻撃状態に移行
-                self.attack_timer = 0  # タイマーリセット
-                self.base_x = self.x  # 新しい基準位置を設定
-                self.sway_phase = random.uniform(0, 6.28)  # 揺れ位相をランダム化
+                self.base_x = target_x
+                self.base_y = target_y
+                self.state = ENEMY_STATE_FORMATION_READY
 
+    def _update_formation_ready(self, move_amount_x):
+        """隊列準備完了状態処理"""
+        # Wait for all enemies to be ready
+        pass
+
+    def _update_normal(self, move_amount_x):
+        """通常の隊列移動処理"""
+        # 通常状態：隊列移動（main.pyで処理される）
+        self.x += move_amount_x
+        self.base_x += move_amount_x # base_xも更新
+
+    def _update_prepare_attack(self, move_amount_x):
+        """攻撃準備状態処理"""
+        # 攻撃準備状態：隊列位置キープ＋上下プルプル身震い
+        self.attack_timer += 1
+        
+        # X座標は隊列移動に従う（main.pyで更新される）
+        # Y座標のみ上下プルプル動作
+        self.shake_phase_y += PREPARE_SHAKE_FREQUENCY_Y
+        shake_offset_y = math.sin(self.shake_phase_y) * PREPARE_SHAKE_AMPLITUDE_Y
+        self.y = self.base_y + shake_offset_y
+        self.x += move_amount_x # グループ移動を反映
+        self.base_x += move_amount_x # base_xも更新
+        
+        # 準備時間が経過したら攻撃状態に移行
+        if self.attack_timer >= PREPARE_ATTACK_DURATION:
+            self.state = ENEMY_STATE_ATTACK
+            self.attack_timer = 0  # タイマーリセット
+
+    def _update_attack(self, move_amount_x):
+        """攻撃状態処理"""
+        # 攻撃状態：下方向移動＋フラフラ動作
+        self.attack_timer += 1
+        
+        # 下方向に移動
+        self.y += ATTACK_MOVE_SPEED
+        
+        # 左右の揺れ動作
+        self.sway_phase += ATTACK_SWAY_FREQUENCY
+        sway_offset = math.sin(self.sway_phase) * ATTACK_SWAY_AMPLITUDE
+        self.x = self.base_x + sway_offset + move_amount_x # グループ移動を反映
+        
+        # 画面下に出た場合
+        if self.y > Common.WIN_HEIGHT:
+            # 他のアクティブな敵がいるかチェック
+            other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
+            
+            if not other_active_enemies:
+                # 他に敵がいない場合は連続攻撃モードに移行
+                self.state = ENEMY_STATE_CONTINUOUS_ATTACK
+            else:
+                # 他に敵がいる場合は通常の復帰処理
+                self.state = ENEMY_STATE_RETURNING
+            
+            self.attack_timer = 0  # タイマーリセット
+            # 画面外に出た時のX座標を記録
+            self.exit_x = self.x
+            # 画面下の待機位置に移動（プレイヤーの弾が届かない位置）
+            self.y = Common.WIN_HEIGHT + 16
+
+    def _update_returning(self, move_amount_x):
+        """復帰待機状態処理"""
+        # 復帰待機状態（画面下で待機）
+        self.attack_timer += 1
+        
+        # 他のアクティブな敵がいるかチェック
+        other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
+        
+        if not other_active_enemies:
+            # 他に敵がいない場合は連続攻撃モードに移行
+            self.state = ENEMY_STATE_CONTINUOUS_ATTACK
+            self.attack_timer = 0  # タイマーリセット
+            return
+        
+        # 画面下の待機位置をキープ（プレイヤーの弾が当たらない）
+        self.y = Common.WIN_HEIGHT + 16
+        self.x = self.exit_x  # 画面外に出た時のX座標で待機
+        self.x += move_amount_x # グループ移動を反映
+        
+        # 復帰時間が経過したら上から復帰降下開始
+        if self.attack_timer >= RETURN_DELAY:
+            # 画面外に出た時のX座標で上から復帰
+            self.x = self.exit_x
+            self.y = -16  # 画面上部から開始
+            self.state = ENEMY_STATE_DESCENDING  # 復帰降下状態に移行
+
+    def _update_descending(self, move_amount_x):
+        """復帰降下状態処理"""
+        # 復帰降下状態：元の隊列位置に向かって移動
+        
+        # 他のアクティブな敵がいるかチェック
+        other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
+        
+        if not other_active_enemies:
+            # 他に敵がいない場合は連続攻撃モードに移行
+            self.state = ENEMY_STATE_CONTINUOUS_ATTACK
+            self.attack_timer = 0  # タイマーリセット
+            return
+        
+        # 下方向に降下
+        self.y += DESCEND_SPEED
+        
+        # 現在の隊列位置（formation_x, formation_y）に向かって移動
+        target_x = self.formation_x
+        target_y = self.formation_y
+        
+        # X方向の移動（隊列位置に向かって）
+        x_diff = target_x - self.x
+        if abs(x_diff) > 1:  # まだ離れている場合
+            self.x += math.copysign(min(abs(x_diff), 2), x_diff)  # 最大2ピクセル/フレームで移動
+        else:
+            self.x = target_x  # 十分近づいたら正確な位置に
+        self.x += move_amount_x # グループ移動を反映
+        
+        # 隊列位置に近づいたかチェック
+        distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
+        if distance_to_formation <= FORMATION_PROXIMITY:
+            # 隊列に復帰
+            self.x = target_x
+            self.y = target_y
+            self.base_x = target_x  # base_xも更新
+            self.base_y = target_y  # base_yも更新
+            self.state = ENEMY_STATE_NORMAL  # 通常状態に戻る
+            self.attack_cooldown_timer = ATTACK_COOLDOWN  # 攻撃クールダウン開始
+
+    def _update_continuous_attack(self, move_amount_x):
+        """連続攻撃モード処理"""
+        # 連続攻撃モード：最後の敵が永続的に攻撃を続ける
+        self.attack_timer += 1
+        
+        # 画面下の待機位置をキープ（短い時間）
+        self.y = Common.WIN_HEIGHT + 16
+        self.x = self.exit_x  # 画面外に出た時のX座標で待機
+        self.x += move_amount_x # グループ移動を反映
+        
+        # 短い復帰時間が経過したら再び攻撃開始
+        if self.attack_timer >= RETURN_DELAY_CONTINUOUS:
+            # ランダムなX座標で上から再出現
+            self.x = random.randint(8, Common.WIN_WIDTH - 16)
+            self.y = -16  # 画面上部から開始
+            self.state = ENEMY_STATE_ATTACK  # 攻撃状態に移行
+            self.attack_timer = 0  # タイマーリセット
+            self.base_x = self.x  # 新しい基準位置を設定
+            self.sway_phase = random.uniform(0, 6.28)  # 揺れ位相をランダム化
+
+    def _update_shooting(self):
+        """射撃処理"""
         # 発射処理（通常状態と連続攻撃モードの敵）
         if self.state == ENEMY_STATE_NORMAL or self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
             self.shoot_timer -= 1

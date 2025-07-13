@@ -10,7 +10,7 @@ from Bullet import Bullet
 ExtNames = ["EXT01", "EXT02", "EXT03", "EXT04"]
 ExtMax = len(ExtNames)
 
-SHOTTIMER = 8  # 弾の発射間隔
+SHOTTIMER = 16  # 弾の発射間隔
 
 MuzlNames = ["MUZL01", "MUZL02", "MUZL03"] #0-2
 MuzlStarIndex = 2

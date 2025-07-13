@@ -32,32 +32,6 @@ def update_playing(self):
     #爆発エフェクトはヒットストップに含めない
     Common.explode_manager.update()
     
-    if Common.StopTimer > 0:
-        Common.StopTimer -= 1
-        return  
-
-    self.star_manager.update()
-    self.player.update()
-
-    #ゲームスタート時の敵スポーン処理
-    if Common.GameStateSub == Common.STATE_PLAYING_ENEMY_SPAWN:
-        BASEX = 11
-        OFSX = 10
-
-        BASEY = 11
-        OFSY = 10
-
-        # --- 敵のスポーン処理 ---
-        for _y in range(4):
-            enemy_y = OFSY + (BASEY * _y)
-            for _x in range(10):
-                enemy_x = OFSX + (BASEX * _x)
-                sprite_num = Common.get_current_stage_map()[_y][_x]
-                _Enemy = Enemy(enemy_x, enemy_y, 8, 8, 2, 100, sprite_num)
-                Common.enemy_list.append(_Enemy)
-        
-        Common.GameStateSub = Common.STATE_PLAYING_FIGHT
-
     # --- 弾の移動処理（プレイヤーの弾） ---
     for _b in Common.player_bullet_list:
         _b.update()
@@ -66,51 +40,166 @@ def update_playing(self):
     for _b in Common.enemy_bullet_list:
         _b.update()
 
+    # move_amountを初期化
+    move_amount = 0
+
+    # --- 敵の移動処理（戦闘中のみ） ---
+    if Common.GameStateSub == Common.STATE_PLAYING_FIGHT:
+        # グループ移動の更新
+        Common.enemy_group_x += ENEMY_MOVE_SPEED * Common.enemy_move_direction
+        
+        # 移動量が閾値を超えたら整数値で移動
+        if abs(Common.enemy_group_x) >= MOVE_THRESHOLD:
+            move_amount = int(Common.enemy_group_x)
+            Common.enemy_group_x -= move_amount
+            
+            # 画面端での方向転換チェック
+            formation_enemies = [e for e in Common.enemy_list if e.active and (e.state == 0 or e.state == 1)]
+            if formation_enemies:
+                if Common.enemy_move_direction == Common.ENEMY_MOVE_RIGHT:
+                    # 右端のエネミーを探す
+                    rightmost_x = max(enemy.base_x for enemy in formation_enemies)
+                    if rightmost_x + 8 >= Common.WIN_WIDTH:  # 8はエネミーの幅
+                        Common.enemy_move_direction = Common.ENEMY_MOVE_LEFT
+                else:
+                    # 左端のエネミーを探す
+                    leftmost_x = min(enemy.base_x for enemy in formation_enemies)
+                    if leftmost_x <= 0:
+                        Common.enemy_move_direction = Common.ENEMY_MOVE_RIGHT
+
+        # 攻撃ステート選択の更新
+        Common.update_enemy_attack_selection()
+
+    # 各敵のupdateを呼び出す (ヒットストップ中も状態遷移は進める)
+    for _e in Common.enemy_list:
+        _e.update(move_amount)
+
+    #ゲームスタート時の敵スポーン処理
+    if Common.GameStateSub == Common.STATE_PLAYING_ENEMY_ENTRY:
+        if not hasattr(self, 'spawn_timer'):
+            self.spawn_timer = 0
+            self.spawn_index = 0
+            # Clear existing enemies for new stage
+            Common.enemy_list.clear()
+
+        self.spawn_timer += 1
+        if self.spawn_timer % 6 == 0 and self.spawn_index < 40:
+            _y = self.spawn_index // 10
+            _x = self.spawn_index % 10
+
+            BASEX = 11
+            OFSX = 10
+            BASEY = 11
+            OFSY = 10
+
+            enemy_y = OFSY + (BASEY * _y)
+            enemy_x = OFSX + (BASEX * _x)
+            sprite_num = Common.get_current_stage_map()[_y][_x]
+            
+            pattern = 1 if _x < 5 else 2
+
+            _Enemy = Enemy(0, 0, 8, 8, 2, 100, sprite_num, formation_pos=(enemy_x, enemy_y), entry_pattern=pattern)
+            Common.enemy_list.append(_Enemy)
+            
+            self.spawn_index += 1
+
+        # Check if all enemies are spawned and ready
+        if self.spawn_index >= 40:
+            # activeな敵のうち、全員がFORMATION_READYならNORMALへ遷移
+            active_ready = [e for e in Common.enemy_list if e.active and e.state == -2]
+            active_count = len([e for e in Common.enemy_list if e.active])
+            if active_count == 0:
+                # 全員倒された場合は即クリア判定へ
+                Common.GameStateSub = Common.STATE_PLAYING_STAGE_CLEAR
+                del self.spawn_timer
+                del self.spawn_index
+            elif active_count > 0 and len(active_ready) == active_count:
+                # activeな敵だけNORMALへ遷移
+                for enemy in Common.enemy_list:
+                    if enemy.active and enemy.state == -2:
+                        enemy.state = 0 # ENEMY_STATE_NORMAL
+                        enemy.attack_cooldown_timer = random.randint(0, 300)
+                del self.spawn_timer
+                del self.spawn_index
+                Common.GameStateSub = Common.STATE_PLAYING_FIGHT
+
     # ステージクリア時の処理
     if Common.GameStateSub == Common.STATE_PLAYING_STAGE_CLEAR:
         if pyxel.btn(pyxel.KEY_Z):
             Common.CURRENT_STAGE += 1
-            Common.GameStateSub = Common.STATE_PLAYING_ENEMY_SPAWN
+            # Reset enemy_list for the new stage
+            Common.enemy_list.clear()
+            Common.GameStateSub = Common.STATE_PLAYING_ENEMY_ENTRY
         return
 
-    # --- 敵の移動処理だけを行う（衝突判定は外す） ---
-    # グループ移動の更新
-    Common.enemy_group_x += ENEMY_MOVE_SPEED * Common.enemy_move_direction
-    
-    # 移動量が閾値を超えたら整数値で移動
-    if abs(Common.enemy_group_x) >= MOVE_THRESHOLD:
-        move_amount = int(Common.enemy_group_x)
-        Common.enemy_group_x -= move_amount
-        
-        # グループ全体の移動（通常状態と攻撃準備状態の敵）
+    # ここから下の処理はヒットストップの影響を受ける
+    if Common.StopTimer > 0:
+        Common.StopTimer -= 1
+        return
+
+    self.star_manager.update()
+    self.player.update()
+
+    # --- 衝突判定：プレイヤー弾 vs 敵 ---
+    for bullet in Common.player_bullet_list:
+        if not bullet.active:
+            continue  # 非アクティブな弾はスキップ
+
         for enemy in Common.enemy_list:
-            if enemy.active and (enemy.state == 0 or enemy.state == 1):  # NORMAL or PREPARE_ATTACK
-                enemy.x += move_amount
-                enemy.base_x += move_amount  # 基準位置も更新
-            
-            # 全ての敵の隊列内位置を更新（攻撃中・復帰中の敵も追跡）
-            if enemy.active:
-                enemy.formation_x += move_amount
+            if not enemy.active:
+                continue  # 非アクティブな敵はスキップ
 
-        # 画面端での方向転換チェック（通常状態と攻撃準備状態の敵）
-        formation_enemies = [e for e in Common.enemy_list if e.active and (e.state == 0 or e.state == 1)]
-        if formation_enemies:
-            if Common.enemy_move_direction == Common.ENEMY_MOVE_RIGHT:
-                # 右端のエネミーを探す
-                rightmost_x = max(enemy.base_x for enemy in formation_enemies)
-                if rightmost_x + 8 >= Common.WIN_WIDTH:  # 8はエネミーの幅
-                    Common.enemy_move_direction = Common.ENEMY_MOVE_LEFT
-            else:
-                # 左端のエネミーを探す
-                leftmost_x = min(enemy.base_x for enemy in formation_enemies)
-                if leftmost_x <= 0:
-                    Common.enemy_move_direction = Common.ENEMY_MOVE_RIGHT
+            # 衝突しているかをチェック
+            if Common.check_collision(
+                bullet.x + bullet.col_x, bullet.y + bullet.col_y, bullet.col_w, bullet.col_h,
+                enemy.x + enemy.col_x, enemy.y + enemy.col_y, enemy.col_w, enemy.col_h
+            ):
+                enemy.on_hit(bullet)  # ヒット処理（敵のライフ減少、爆発など）
 
-    # 攻撃ステート選択の更新
-    Common.update_enemy_attack_selection()
+    # --- 衝突判定：敵弾 vs プレイヤー ---
+    for bullet in Common.enemy_bullet_list:
+        if not bullet.active:
+            continue  # 非アクティブな弾はスキップ
 
-    for _e in Common.enemy_list:
-        _e.update()
+        # プレイヤーとの衝突チェック
+        if Common.check_collision(
+            bullet.x + bullet.col_x, bullet.y + bullet.col_y, bullet.col_w, bullet.col_h,
+            self.player.x + self.player.col_x, self.player.y + self.player.col_y, 
+            self.player.col_w, self.player.col_h
+        ):
+            bullet.active = False  # 弾を消す
+            self.player.on_hit()  # プレイヤーのヒット処理
+
+    # --- 衝突判定：プレイヤー vs 敵 ---
+    for enemy in Common.enemy_list:
+        if not enemy.active:
+            continue  # 非アクティブな弾はスキップ
+
+        # プレイヤーとの衝突チェック
+        if Common.check_collision(
+            self.player.x + self.player.col_x, self.player.y + self.player.col_y,
+            self.player.col_w, self.player.col_h,
+            enemy.x + enemy.col_x, enemy.y + enemy.col_y,
+            enemy.col_w, enemy.col_h
+        ):
+            self.player.on_hit()  # プレイヤーのヒット処理
+
+    # --- ガベージコレクション（死んだ敵、自弾も除去） ---
+    Common.enemy_list = [e for e in Common.enemy_list if e.active]
+    Common.player_bullet_list = [b for b in Common.player_bullet_list if b.active]
+    Common.enemy_bullet_list = [b for b in Common.enemy_bullet_list if b.active]
+
+    # ステージクリア判定は戦闘中のみ行う
+    if Common.GameStateSub == Common.STATE_PLAYING_FIGHT:
+        Common.check_stage_clear()
+
+    # ここから下の処理はヒットストップの影響を受ける
+    if Common.StopTimer > 0:
+        Common.StopTimer -= 1
+        return
+
+    self.star_manager.update()
+    self.player.update()
 
     # --- 衝突判定：プレイヤー弾 vs 敵 ---
     for bullet in Common.player_bullet_list:
@@ -161,7 +250,9 @@ def update_playing(self):
     Common.player_bullet_list = [b for b in Common.player_bullet_list if b.active]
     Common.enemy_bullet_list = [b for b in Common.enemy_bullet_list if b.active]
 
-    Common.check_stage_clear()
+    # ステージクリア判定は戦闘中のみ行う
+    if Common.GameStateSub == Common.STATE_PLAYING_FIGHT:
+        Common.check_stage_clear()
 
 def draw_playing(self):
 

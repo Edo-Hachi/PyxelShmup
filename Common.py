@@ -26,10 +26,11 @@ STATE_PAUSE = 3
 
 GameState = STATE_TITLE
 
-STATE_PLAYING_ENEMY_SPAWN = 0
-STATE_PLAYING_FIGHT = 1
-STATE_PLAYING_STAGE_CLEAR = 2
-GameStateSub = STATE_PLAYING_ENEMY_SPAWN
+STATE_PLAYING_ENEMY_ENTRY = 0
+STATE_PLAYING_ENEMY_SPAWN = 1
+STATE_PLAYING_FIGHT = 2
+STATE_PLAYING_STAGE_CLEAR = 3
+GameStateSub = STATE_PLAYING_ENEMY_ENTRY
 
 # ステージ管理
 CURRENT_STAGE = 1
@@ -209,10 +210,13 @@ def get_current_stage_map():
 def check_stage_clear():
     """敵が全滅したかチェックし、次のステージに移行する"""
     global CURRENT_STAGE, GameStateSub
-    
+    # デバッグ出力: エネミーの状態
+    print(f"[DEBUG] --- check_stage_clear ---")
+    print(f"[DEBUG] Active Enemy Count: {len([e for e in enemy_list if e.active])}")
+    for idx, e in enumerate(enemy_list):
+        print(f"[DEBUG] Enemy[{idx}]: state={getattr(e, 'state', None)}, active={getattr(e, 'active', None)}")
     # アクティブな敵がいるかチェック
     active_enemies = [e for e in enemy_list if e.active]
-    
     if not active_enemies:  # アクティブな敵がいない場合
         if CURRENT_STAGE < MAX_STAGE:
             GameStateSub = STATE_PLAYING_STAGE_CLEAR

@@ -320,7 +320,7 @@ class Enemy:
             if self.state == ENEMY_STATE_ENTERING:
                 self.state = ENEMY_STATE_FORMATION_READY
             # デバッグ出力
-            print(f"[DEBUG] Enemy destroyed: state={self.state}, active={self.active}")
+            Common.debug_print(f"[DEBUG] Enemy destroyed: state={self.state}, active={self.active}")
             Common.Score += self.Score  # スコア加算
             pyxel.play(0, 1)  # 効果音再生
             Common.explode_manager.spawn_explosion(self.x + 4, self.y + 4, 20, ExpType.RECT)

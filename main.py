@@ -296,7 +296,7 @@ def draw_playing(self):
 
 class App:
     def __init__(self):
-        pyxel.init(Common.WIN_WIDTH, Common.WIN_HEIGHT, title="Mini Shooter", display_scale=5, fps=60)
+        pyxel.init(Common.WIN_WIDTH, Common.WIN_HEIGHT, title="Pyxel Shump!!", display_scale=5, fps=60)
         pyxel.load("my_resource.pyxres")
 
         Common.GameState = Common.STATE_TITLE
@@ -327,6 +327,10 @@ class App:
                 pass     
             case Common.STATE_PAUSE:
                 pass
+            case Common.STATE_GAMECLEAR:
+                # zキーでタイトルに戻る
+                if pyxel.btn(pyxel.KEY_Z):
+                    Common.GameState = Common.STATE_TITLE
 
         #Esc Key Down
         if pyxel.btn(pyxel.KEY_ESCAPE):
@@ -338,14 +342,19 @@ class App:
         match Common.GameState:
             case Common.STATE_TITLE:
                 draw_title(self)
+
             case Common.STATE_PLAYING:
                 draw_playing(self)
             case Common.STATE_GAMEOVER:
                 pyxel.text(40, 50, "Game Over", 7)
-
                 pass
             case Common.STATE_PAUSE:
                 pass
+            case Common.STATE_GAMECLEAR:
+                pyxel.cls(pyxel.COLOR_NAVY)
+                self.star_manager.draw()
+                pyxel.text(35, 50, "Congratulations!", pyxel.COLOR_YELLOW)
+                pyxel.text(35, 80, "Press Z to Title", 7)
 
 
 App()

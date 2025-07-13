@@ -3,11 +3,15 @@ from ExplodeManager import ExpMan
 import random
 #from enum import Enum
 
-VERSION = "0.1.3"
-LAUNCH_DATE = "2025/06/14"
+VERSION = "0.1.5"
+LAUNCH_DATE = "2025/07/13"
 
 
-DEBUG = False #or False
+DEBUG = False #or True
+
+def debug_print(*args, **kwargs):
+    if DEBUG:
+        print(*args, **kwargs)
 
 #Window size
 WIN_WIDTH = 128
@@ -23,6 +27,7 @@ STATE_TITLE = 0
 STATE_PLAYING = 1
 STATE_GAMEOVER = 2
 STATE_PAUSE = 3
+STATE_GAMECLEAR = 4  # ゲームクリア状態
 
 GameState = STATE_TITLE
 
@@ -211,15 +216,20 @@ def check_stage_clear():
     """敵が全滅したかチェックし、次のステージに移行する"""
     global CURRENT_STAGE, GameStateSub
     # デバッグ出力: エネミーの状態
-    print(f"[DEBUG] --- check_stage_clear ---")
-    print(f"[DEBUG] Active Enemy Count: {len([e for e in enemy_list if e.active])}")
+    debug_print(f"[DEBUG] --- check_stage_clear ---")
+    debug_print(f"[DEBUG] Active Enemy Count: {len([e for e in enemy_list if e.active])}")
     for idx, e in enumerate(enemy_list):
-        print(f"[DEBUG] Enemy[{idx}]: state={getattr(e, 'state', None)}, active={getattr(e, 'active', None)}")
+        debug_print(f"[DEBUG] Enemy[{idx}]: state={getattr(e, 'state', None)}, active={getattr(e, 'active', None)}")
     # アクティブな敵がいるかチェック
     active_enemies = [e for e in enemy_list if e.active]
     if not active_enemies:  # アクティブな敵がいない場合
         if CURRENT_STAGE < MAX_STAGE:
             GameStateSub = STATE_PLAYING_STAGE_CLEAR
+            return True
+        else:
+            # 最終ステージクリア時
+            import Common
+            Common.GameState = Common.STATE_GAMECLEAR
             return True
     return False
 

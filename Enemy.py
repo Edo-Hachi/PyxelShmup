@@ -21,7 +21,7 @@ ENEMY_STATE_DESCENDING = 4      # 復帰降下中（隊列位置に向かって�
 ENEMY_STATE_CONTINUOUS_ATTACK = 5  # 連続攻撃モード（隊列復帰なし）
 
 # 攻撃モード関連の定数
-PREPARE_ATTACK_DURATION = 180  # 攻撃準備時間（フレーム：3秒）
+PREPARE_ATTACK_DURATION = 60  # 攻撃準備時間（フレーム：3秒）
 PREPARE_SHAKE_AMPLITUDE_X = 1.0  # 準備中の左右身震い幅
 PREPARE_SHAKE_AMPLITUDE_Y = 1.2  # 準備中の上下身震い幅（より目立つプルプル感）
 PREPARE_SHAKE_FREQUENCY_X = 0.2  # 準備中の左右身震い頻度（ゆっくり）

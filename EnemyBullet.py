@@ -1,32 +1,31 @@
 import pyxel
 import Common
+import Config
+from SpriteManager import SprList
 
 class EnemyBullet:
-    def __init__(self, x, y, w=8, h=8, speed=2):
+    def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.w = w
-        self.h = h
-
-        self.col_x = 2  # Collision Box
-        self.col_y = 2
-        self.col_w = 4
-        self.col_h = 4
-
-        self.speed = speed
+        self.speed = Config.ENEMY_BULLET_SPEED
         self.active = True
+        
+        # Collision box
+        self.col_x, self.col_y, self.col_w, self.col_h = Config.ENEMY_BULLET_COLLISION_BOX
 
     def update(self):
         self.y += self.speed
-        if self.y > Common.WIN_HEIGHT:  # 画面外に出たら消す
+        
+        # Screen boundary check
+        if self.y > Config.WIN_HEIGHT:
             self.active = False
 
     def draw(self):
-        pyxel.blt(self.x, self.y, Common.TILE_BANK0,
-                Common.SprList["ENEMY_BULLET"].x, Common.SprList["ENEMY_BULLET"].y, 
-                self.w, self.h, pyxel.COLOR_BLACK)
-   
+        pyxel.blt(self.x, self.y, Config.TILE_BANK0, 
+                  SprList["ENEMY_BULLET"].x, SprList["ENEMY_BULLET"].y, 
+                  8, 8, pyxel.COLOR_BLACK)
+        
         # Collision Box
-        if Common.DEBUG:
+        if Config.DEBUG:
             pyxel.rectb(self.x + self.col_x, self.y + self.col_y, 
-                       self.col_w, self.col_h, pyxel.COLOR_RED) 
+                       self.col_w, self.col_h, pyxel.COLOR_RED)

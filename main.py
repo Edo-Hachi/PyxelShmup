@@ -2,6 +2,10 @@ import pyxel
 import random
 
 import Common
+import Config
+import GameState
+from SpriteManager import SprList
+from StageManager import get_current_stage_map, check_stage_clear
 from Enemy import Enemy, ENEMY_MOVE_SPEED, MOVE_THRESHOLD
 from ExplodeManager import ExpType
 
@@ -12,7 +16,7 @@ from Player import Player
 def update_title(self):
     self.star_manager.update()
     if pyxel.btn(pyxel.KEY_SPACE):
-        Common.GameState = Common.STATE_PLAYING
+        GameState.GameState = Config.STATE_PLAYING
 
 def draw_title(self):
     
@@ -21,7 +25,7 @@ def draw_title(self):
 
     pyxel.text(40, 50, "Pyxel Shumup", 7)
     pyxel.text(25, 70, "Press SPACE to Start", 7)
-    pyxel.text(40, 110, "Game Ver:" + str(Common.VERSION), 7)
+    pyxel.text(40, 110, "Game Ver:" + str(Config.VERSION), 7)
     pyxel.text(40, 120, "Pyxel Ver:" + str(pyxel.VERSION), 7)
 
 # Title State ----------------------------------------
@@ -44,28 +48,28 @@ def update_playing(self):
     move_amount = 0
 
     # --- 敵の移動処理（戦闘中のみ） ---
-    if Common.GameStateSub == Common.STATE_PLAYING_FIGHT:
+    if GameState.GameStateSub == Config.STATE_PLAYING_FIGHT:
         # グループ移動の更新
-        Common.enemy_group_x += ENEMY_MOVE_SPEED * Common.enemy_move_direction
+        GameState.enemy_group_x += ENEMY_MOVE_SPEED * GameState.enemy_move_direction
         
         # 移動量が閾値を超えたら整数値で移動
-        if abs(Common.enemy_group_x) >= MOVE_THRESHOLD:
-            move_amount = int(Common.enemy_group_x)
-            Common.enemy_group_x -= move_amount
+        if abs(GameState.enemy_group_x) >= MOVE_THRESHOLD:
+            move_amount = int(GameState.enemy_group_x)
+            GameState.enemy_group_x -= move_amount
             
             # 画面端での方向転換チェック
             formation_enemies = [e for e in Common.enemy_list if e.active and (e.state == 0 or e.state == 1)]
             if formation_enemies:
-                if Common.enemy_move_direction == Common.ENEMY_MOVE_RIGHT:
+                if GameState.enemy_move_direction == GameState.ENEMY_MOVE_RIGHT:
                     # 右端のエネミーを探す
                     rightmost_x = max(enemy.base_x for enemy in formation_enemies)
-                    if rightmost_x + 8 >= Common.WIN_WIDTH:  # 8はエネミーの幅
-                        Common.enemy_move_direction = Common.ENEMY_MOVE_LEFT
+                    if rightmost_x + 8 >= Config.WIN_WIDTH:  # 8はエネミーの幅
+                        GameState.enemy_move_direction = GameState.ENEMY_MOVE_LEFT
                 else:
                     # 左端のエネミーを探す
                     leftmost_x = min(enemy.base_x for enemy in formation_enemies)
                     if leftmost_x <= 0:
-                        Common.enemy_move_direction = Common.ENEMY_MOVE_RIGHT
+                        GameState.enemy_move_direction = GameState.ENEMY_MOVE_RIGHT
 
         # 攻撃ステート選択の更新
         Common.update_enemy_attack_selection()
@@ -75,7 +79,7 @@ def update_playing(self):
         _e.update(move_amount)
 
     #ゲームスタート時の敵スポーン処理
-    if Common.GameStateSub == Common.STATE_PLAYING_ENEMY_ENTRY:
+    if GameState.GameStateSub == Config.STATE_PLAYING_ENEMY_ENTRY:
         if not hasattr(self, 'spawn_timer'):
             self.spawn_timer = 0
             self.spawn_index = 0
@@ -94,7 +98,7 @@ def update_playing(self):
 
             enemy_y = OFSY + (BASEY * _y)
             enemy_x = OFSX + (BASEX * _x)
-            sprite_num = Common.get_current_stage_map()[_y][_x]
+            sprite_num = get_current_stage_map()[_y][_x]
             
             pattern = 1 if _x < 5 else 2
 
@@ -110,7 +114,7 @@ def update_playing(self):
             active_count = len([e for e in Common.enemy_list if e.active])
             if active_count == 0:
                 # 全員倒された場合は即クリア判定へ
-                Common.GameStateSub = Common.STATE_PLAYING_STAGE_CLEAR
+                GameState.GameStateSub = Config.STATE_PLAYING_STAGE_CLEAR
                 del self.spawn_timer
                 del self.spawn_index
             elif active_count > 0 and len(active_ready) == active_count:
@@ -121,20 +125,20 @@ def update_playing(self):
                         enemy.attack_cooldown_timer = random.randint(0, 300)
                 del self.spawn_timer
                 del self.spawn_index
-                Common.GameStateSub = Common.STATE_PLAYING_FIGHT
+                GameState.GameStateSub = Config.STATE_PLAYING_FIGHT
 
     # ステージクリア時の処理
-    if Common.GameStateSub == Common.STATE_PLAYING_STAGE_CLEAR:
+    if GameState.GameStateSub == Config.STATE_PLAYING_STAGE_CLEAR:
         if pyxel.btn(pyxel.KEY_Z):
-            Common.CURRENT_STAGE += 1
+            GameState.CURRENT_STAGE += 1
             # Reset enemy_list for the new stage
             Common.enemy_list.clear()
-            Common.GameStateSub = Common.STATE_PLAYING_ENEMY_ENTRY
+            GameState.GameStateSub = Config.STATE_PLAYING_ENEMY_ENTRY
         return
 
     # ここから下の処理はヒットストップの影響を受ける
-    if Common.StopTimer > 0:
-        Common.StopTimer -= 1
+    if GameState.StopTimer > 0:
+        GameState.StopTimer -= 1
         return
 
     self.star_manager.update()
@@ -190,22 +194,22 @@ def update_playing(self):
     Common.enemy_bullet_list = [b for b in Common.enemy_bullet_list if b.active]
 
     # ステージクリア判定は戦闘中のみ行う
-    if Common.GameStateSub == Common.STATE_PLAYING_FIGHT:
-        Common.check_stage_clear()
+    if GameState.GameStateSub == Config.STATE_PLAYING_FIGHT:
+        check_stage_clear(Common.enemy_list)
 
 def draw_playing(self):
 
-    if Common.ShakeTimer == 10:
+    if GameState.ShakeTimer == 10:
         pyxel.cls(pyxel.COLOR_WHITE)
     else:
         pyxel.cls(pyxel.COLOR_NAVY)
 
-    if Common.ShakeTimer > 0:
+    if GameState.ShakeTimer > 0:
         # カメラシェイクの実装
-        shake_offset_x = random.randint(-Common.ShakeStrength, Common.ShakeStrength)
-        shake_offset_y = random.randint(-Common.ShakeStrength, Common.ShakeStrength)
+        shake_offset_x = random.randint(-Config.SHAKE_STRENGTH, Config.SHAKE_STRENGTH)
+        shake_offset_y = random.randint(-Config.SHAKE_STRENGTH, Config.SHAKE_STRENGTH)
         pyxel.camera(shake_offset_x, shake_offset_y)
-        Common.ShakeTimer -= 1
+        GameState.ShakeTimer -= 1
     else:
         pyxel.camera(0, 0)  
 
@@ -226,50 +230,50 @@ def draw_playing(self):
 
     #Draw HUD
     pyxel.camera(0, 0)      
-    pyxel.text(8, 0, "Score: " + str(Common.Score), 7)
+    pyxel.text(8, 0, "Score: " + str(GameState.Score), 7)
 
     # ステージクリア表示
-    if Common.GameStateSub == Common.STATE_PLAYING_STAGE_CLEAR:
+    if GameState.GameStateSub == Config.STATE_PLAYING_STAGE_CLEAR:
         pyxel.text(40, 50, "Stage Clear!", 7)
         pyxel.text(20, 70, "Press Z to continue", 7)
 
 class App:
     def __init__(self):
-        pyxel.init(Common.WIN_WIDTH, Common.WIN_HEIGHT, title="Pyxel Shump!!", display_scale=5, fps=60)
+        pyxel.init(Config.WIN_WIDTH, Config.WIN_HEIGHT, title="Pyxel Shump!!", display_scale=Config.DISPLAY_SCALE, fps=Config.FPS)
         pyxel.load("my_resource.pyxres")
 
-        Common.GameState = Common.STATE_TITLE
+        GameState.GameState = Config.STATE_TITLE
 
         #Bg Stars
-        self.star_manager = StarManager(count=100)        
+        self.star_manager = StarManager(count=Config.STAR_COUNT)        
 
         #Player Star Ship
         self.player = Player(64-4, 108)
 
-        Common.Score = 10
-        Common.HighScore = 100
+        GameState.Score = 10
+        GameState.HighScore = 100
 
         pyxel.run(self.update, self.draw)
         
 
     def update(self):
-        Common.GameTimer += 1
+        GameState.GameTimer += 1
 
-        match Common.GameState:
+        match GameState.GameState:
         
-            case Common.STATE_TITLE:
+            case Config.STATE_TITLE:
                 update_title(self)
-            case Common.STATE_PLAYING:
+            case Config.STATE_PLAYING:
                 update_playing(self)
-            case Common.STATE_GAMEOVER:
+            case Config.STATE_GAMEOVER:
                 #print("Game Over")
                 pass     
-            case Common.STATE_PAUSE:
+            case Config.STATE_PAUSE:
                 pass
-            case Common.STATE_GAMECLEAR:
+            case Config.STATE_GAMECLEAR:
                 # zキーでタイトルに戻る
                 if pyxel.btn(pyxel.KEY_Z):
-                    Common.GameState = Common.STATE_TITLE
+                    GameState.GameState = Config.STATE_TITLE
 
         #Esc Key Down
         if pyxel.btn(pyxel.KEY_ESCAPE):
@@ -278,18 +282,18 @@ class App:
    
     def draw(self):
 
-        match Common.GameState:
-            case Common.STATE_TITLE:
+        match GameState.GameState:
+            case Config.STATE_TITLE:
                 draw_title(self)
 
-            case Common.STATE_PLAYING:
+            case Config.STATE_PLAYING:
                 draw_playing(self)
-            case Common.STATE_GAMEOVER:
+            case Config.STATE_GAMEOVER:
                 pyxel.text(40, 50, "Game Over", 7)
                 pass
-            case Common.STATE_PAUSE:
+            case Config.STATE_PAUSE:
                 pass
-            case Common.STATE_GAMECLEAR:
+            case Config.STATE_GAMECLEAR:
                 pyxel.cls(pyxel.COLOR_NAVY)
                 self.star_manager.draw()
                 pyxel.text(35, 50, "Congratulations!", pyxel.COLOR_YELLOW)

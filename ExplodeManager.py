@@ -1,7 +1,8 @@
 import pyxel
 import random
 from enum import Enum
-import Common
+import Config
+import GameState
 
 
 class ExpType(Enum):
@@ -234,7 +235,7 @@ class ExpMan:
 
     def update(self):
         
-        if Common.StopTimer > 0:
+        if GameState.StopTimer > 0:
             return
           
         for exp in self.explosions:

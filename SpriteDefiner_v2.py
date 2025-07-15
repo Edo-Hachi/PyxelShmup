@@ -46,8 +46,9 @@ class SpriteDefiner:
         self.command_input = ""  # Input text for current command
         self.edit_locked_sprite = None  # Sprite position locked during edit
         
-        # Save confirmation
+        # Confirmation modes
         self.save_confirm_mode = False  # Y/N confirmation for F10 save
+        self.quit_confirm_mode = False  # Y/N confirmation for F12 quit
         
         self.message = "Use arrow keys to move (auto-select), F1 for EDIT, F2 for VIEW"
         
@@ -68,6 +69,8 @@ class SpriteDefiner:
         """Update game logic"""
         if self.save_confirm_mode:
             self._handle_save_confirmation()
+        elif self.quit_confirm_mode:
+            self._handle_quit_confirmation()
         elif self.input_mode:
             self._handle_text_input()
         elif self.command_mode:
@@ -76,17 +79,18 @@ class SpriteDefiner:
             self._handle_normal_input()
         
         # Save functionality (F10 - VIEW mode only) - now with confirmation
-        if pyxel.btnp(pyxel.KEY_F10) and not self.edit_mode and not self.save_confirm_mode:
+        if pyxel.btnp(pyxel.KEY_F10) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
             self.save_confirm_mode = True
             self.message = "Save to sprites.json? Press Y to confirm, N to cancel"
         
         # Load functionality (F11 - VIEW mode only)
-        if pyxel.btnp(pyxel.KEY_F11) and not self.edit_mode:
+        if pyxel.btnp(pyxel.KEY_F11) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
             self._load_from_json()
         
-        # Quit (F12 only - VIEW mode only)
-        if pyxel.btnp(pyxel.KEY_F12) and not self.edit_mode:
-            pyxel.quit()
+        # Quit (F12 only - VIEW mode only) - now with confirmation
+        if pyxel.btnp(pyxel.KEY_F12) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
+            self.quit_confirm_mode = True
+            self.message = "Really quit? Press Y to confirm, N to cancel"
         
         # Disabled ESC/Q quit for safety
         if pyxel.btnp(pyxel.KEY_Q) or pyxel.btnp(pyxel.KEY_ESCAPE):
@@ -291,6 +295,14 @@ class SpriteDefiner:
             self.save_confirm_mode = False
             self.message = "Save cancelled"
     
+    def _handle_quit_confirmation(self):
+        """Handle Y/N confirmation for quit"""
+        if pyxel.btnp(pyxel.KEY_Y):
+            pyxel.quit()
+        elif pyxel.btnp(pyxel.KEY_N) or pyxel.btnp(pyxel.KEY_ESCAPE):
+            self.quit_confirm_mode = False
+            self.message = "Quit cancelled"
+    
     def _process_command(self):
         """Process the completed command"""
         # Use locked sprite position in EDIT mode
@@ -472,7 +484,7 @@ class SpriteDefiner:
         self._draw_dynamic_info(sprite_list_x)
         
         # Draw recent edited sprite names (always visible at far right)
-        recent_names_x = sprite_list_x + 80  # Position at far right (moved 20px left)
+        recent_names_x = sprite_list_x + 100  # Position at far right (moved 20px left)
         self._draw_recent_sprite_names(recent_names_x)
         
         # Controls (bottom)
@@ -582,8 +594,12 @@ class SpriteDefiner:
         if self.save_confirm_mode:
             pyxel.text(10, y_pos + 24, "Save to sprites.json? [Y]es / [N]o / [ESC]ape", pyxel.COLOR_YELLOW)
         
+        # Quit confirmation prompt
+        if self.quit_confirm_mode:
+            pyxel.text(10, y_pos + 24, "Really quit? [Y]es / [N]o / [ESC]ape", pyxel.COLOR_RED)
+        
         # Message
-        message_color = pyxel.COLOR_YELLOW if self.save_confirm_mode else pyxel.COLOR_WHITE
+        message_color = pyxel.COLOR_YELLOW if self.save_confirm_mode or self.quit_confirm_mode else pyxel.COLOR_WHITE
         pyxel.text(10, y_pos + 36, self.message, message_color)
     
     def _draw_dynamic_info(self, x_pos):

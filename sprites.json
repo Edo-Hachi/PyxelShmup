@@ -1,0 +1,123 @@
+{
+  "meta": {
+    "sprite_size": 8,
+    "resource_file": "my_resource.pyxres",
+    "created_by": "SpriteDefiner v2",
+    "version": "2.0"
+  },
+  "sprites": {
+    "8_0": {
+      "x": 8,
+      "y": 0,
+      "name": "PLAYER",
+      "tags": [
+        "TOP"
+      ]
+    },
+    "16_0": {
+      "x": 16,
+      "y": 0,
+      "name": "PLAYER",
+      "tags": [
+        "LEFT"
+      ]
+    },
+    "24_0": {
+      "x": 24,
+      "y": 0,
+      "name": "PLAYER",
+      "tags": [
+        "RIGHT"
+      ]
+    },
+    "40_0": {
+      "x": 40,
+      "y": 0,
+      "name": "PBULLET",
+      "tags": [
+        "0",
+        "0"
+      ]
+    },
+    "48_0": {
+      "x": 48,
+      "y": 0,
+      "name": "PBULLET",
+      "tags": [
+        "1",
+        "1"
+      ]
+    },
+    "56_0": {
+      "x": 56,
+      "y": 0,
+      "name": "EXHST",
+      "tags": [
+        "UNDEF",
+        "0"
+      ]
+    },
+    "64_0": {
+      "x": 64,
+      "y": 0,
+      "name": "EXHST",
+      "tags": [
+        "UNDEF",
+        "1"
+      ]
+    },
+    "72_0": {
+      "x": 72,
+      "y": 0,
+      "name": "EXHST",
+      "tags": [
+        "UNDEF",
+        "2"
+      ]
+    },
+    "80_0": {
+      "x": 80,
+      "y": 0,
+      "name": "EXHST",
+      "tags": [
+        "UNDEF",
+        "3"
+      ]
+    },
+    "88_0": {
+      "x": 88,
+      "y": 0,
+      "name": "MZLFLSH",
+      "tags": [
+        "UNDEF",
+        "0"
+      ]
+    },
+    "96_0": {
+      "x": 96,
+      "y": 0,
+      "name": "MZLFLSH",
+      "tags": [
+        "UNDEF",
+        "1"
+      ]
+    },
+    "104_0": {
+      "x": 104,
+      "y": 0,
+      "name": "NONAME",
+      "tags": [
+        "UNDEF",
+        "2"
+      ]
+    },
+    "120_0": {
+      "x": 120,
+      "y": 0,
+      "name": "ENMYBLT",
+      "tags": [
+        "UNDEF"
+      ]
+    }
+  }
+}

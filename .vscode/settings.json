@@ -1,3 +1,4 @@
+//For Ubuntu
 {
   "python.pythonPath": "../venv/bin/python"
 }

@@ -1,6 +1,8 @@
-## New enemy entry loop pattern (rect triangle)
-## enemy life
-## Edit Sprite Patturn (sprite_image.md)
+#ソースコードの中のコメントは日本語、英語を併記してください
+##例
+# :jp この関数はスプライトを表示します
+# :en This function displays the sprite
+# #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
 
 
 import pyxel

@@ -1,3 +1,7 @@
+## New enemy entry loop pattern (rect triangle)
+## enemy life
+
+
 import pyxel
 import random
 

@@ -1,5 +1,6 @@
 ## New enemy entry loop pattern (rect triangle)
 ## enemy life
+## Edit Sprite Patturn (sprite_image.md)
 
 
 import pyxel

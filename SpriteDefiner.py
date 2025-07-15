@@ -1,24 +1,41 @@
 #!/usr/bin/env python3
 """
-SpriteDefiner v2 - Enhanced Visual Sprite Definition Tool for Pyxel
+SpriteDefiner  - Enhanced Visual Sprite Definition Tool for Pyxel
 """
+
+#ソースコードの中のコメントは日本語、英語を併記してください
+##例
+# :jp この関数はスプライトを表示します
+# :en This function displays the sprite
+# #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
+
 
 import pyxel
 import json
 from collections import namedtuple
+from enum import Enum
+
+# アプリケーションの状態管理
+class AppState(Enum):
+    VIEW = "view"
+    EDIT = "edit"
+    COMMAND_INPUT = "command_input"
+    LEGACY_INPUT = "legacy_input"
+    SAVE_CONFIRM = "save_confirm"
+    QUIT_CONFIRM = "quit_confirm"
 
 # スプライト定義・編集用のPyxelビジュアルツール本体クラス
 class SpriteDefiner:
     def __init__(self):
-        # Window settings
+        # ウィンドウ設定
         self.WIDTH = 320
-        self.HEIGHT = 240  # Increased height for status area
+        self.HEIGHT = 240  # ステータスエリア用に高さを増加
         
-        # Resource settings
+        # リソース設定
         self.RESOURCE_FILE = "./my_resource.pyxres"
         self.SPRITE_SIZE = 8
         
-        # UI settings
+        # UI設定
         self.GRID_COLOR_VIEW = pyxel.COLOR_WHITE
         self.GRID_COLOR_EDIT = pyxel.COLOR_RED
         self.SELECT_COLOR = pyxel.COLOR_RED
@@ -28,101 +45,136 @@ class SpriteDefiner:
         self.SPRITE_AREA_WIDTH = 128
         self.SPRITE_AREA_HEIGHT = 128
         
-        # State
+        # 状態管理
         self.sprites = {}  # {name: {'x': x, 'y': y, 'tags': []}}
         self.selected_sprite = None  # (x, y)
-        self.cursor_sprite = (0, 0)  # Current cursor position (x, y)
-        self.hover_sprite = None  # Mouse hover position (x, y)
+        self.cursor_sprite = (0, 0)  # 現在のカーソル位置 (x, y)
+        self.hover_sprite = None  # マウスホバー位置 (x, y)
         
-        # Edit history - simple list of sprite names
-        self.edited_sprite_names = []  # List of recently edited sprite names
+        # 編集履歴 - シンプルなスプライト名リスト
+        self.edited_sprite_names = []  # 最近編集されたスプライト名のリスト
         
-        # Input modes
-        self.input_mode = False  # Legacy naming mode
-        self.input_text = ""
+        # アプリケーション状態管理
+        self.app_state = AppState.VIEW  # 現在の状態
         
-        # Edit system
-        self.edit_mode = False  # EDIT/VIEW mode
-        self.command_mode = None  # Current command: None, 'NAME', 'DIC_1', 'DIC_2', 'DIC_3'
-        self.command_input = ""  # Input text for current command
-        self.edit_locked_sprite = None  # Sprite position locked during edit
+        # 入力モード
+        self.input_text = ""  # レガシーテキスト入力
+        self.command_mode = None  # 現在のコマンド: None, 'NAME', 'DIC_1', 'DIC_2', 'DIC_3'
+        self.command_input = ""  # 現在のコマンド用入力テキスト
+        self.edit_locked_sprite = None  # 編集中にロックされたスプライト位置
         
-        # Confirmation modes
-        self.save_confirm_mode = False  # Y/N confirmation for F10 save
-        self.quit_confirm_mode = False  # Y/N confirmation for F12 quit
         
-        self.message = "Use arrow keys to move (auto-select), F1 for EDIT, F2 for VIEW"
+        self.message = "Use arrow keys to move (auto-select), F1 for EDIT, F2 for VIEW, Shift+Enter for legacy naming"
         
-        # UI positions
+        # UI位置
         self.sprite_display_x = 12
         self.sprite_display_y = 12
         
-        # Initialize cursor and selection to same position
-        self.selected_sprite = self.cursor_sprite  # Auto-select initial position
+        # カーソルと選択を同じ位置に初期化
+        self.selected_sprite = self.cursor_sprite  # 初期位置を自動選択
         
-        # Initialize Pyxel
+        # Pyxelを初期化
         pyxel.init(self.WIDTH, self.HEIGHT, title="SpriteDefiner", quit_key=pyxel.KEY_NONE)
         pyxel.load(self.RESOURCE_FILE)
         
+        # 既存のsprites.jsonがあれば自動読み込み
+        self._auto_load_sprites()
+        
         pyxel.run(self.update, self.draw)
+    
+    # 起動時の自動読み込み処理
+    def _auto_load_sprites(self):
+        """起動時にsprites.jsonが存在すれば自動読み込み"""
+        try:
+            with open("sprites.json", "r", encoding="utf-8") as f:
+                sprite_data = json.load(f)
+            
+            # 既存のスプライトをクリア
+            self.sprites = {}
+            
+            # JSONからスプライトを読み込み
+            if "sprites" in sprite_data:
+                for key, data in sprite_data["sprites"].items():
+                    self.sprites[key] = {
+                        'x': data['x'],
+                        'y': data['y'], 
+                        'name': data.get('name', 'NONAME'),
+                        'tags': data.get('tags', ['UNDEF'])
+                    }
+            
+            # 起動メッセージ
+            self.message = f"Startup: Auto-loaded {len(self.sprites)} sprites from sprites.json"
+        except FileNotFoundError:
+            # JSONファイルが見つからない場合 - 通常起動
+            self.message = "Startup: sprites.json not found - starting with empty sprite list"
+        except json.JSONDecodeError:
+            # 無効なJSON形式
+            self.message = "Startup: Invalid sprites.json format - starting with empty sprite list"
+        except Exception as e:
+            # その他のエラー
+            self.message = f"Startup: sprites.json load error - {e}"
     
     # メインループで呼ばれる更新処理。各種モードの入力受付や状態遷移を管理
     def update(self):
-        """Update game logic"""
-        if self.save_confirm_mode:
+        """ゲームロジックの更新"""
+        # 状態に応じた処理の振り分け
+        if self.app_state == AppState.SAVE_CONFIRM:
             self._handle_save_confirmation()
-        elif self.quit_confirm_mode:
+        elif self.app_state == AppState.QUIT_CONFIRM:
             self._handle_quit_confirmation()
-        elif self.input_mode:
+        elif self.app_state == AppState.LEGACY_INPUT:
             self._handle_text_input()
-        elif self.command_mode:
+        elif self.app_state == AppState.COMMAND_INPUT:
             self._handle_command_input()
-        else:
+        elif self.app_state in [AppState.VIEW, AppState.EDIT]:
             self._handle_normal_input()
         
-        # Save functionality (F10 - VIEW mode only) - now with confirmation
-        if pyxel.btnp(pyxel.KEY_F10) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
-            self.save_confirm_mode = True
-            self.message = "Save to sprites.json? Press Y to confirm, N to cancel"
+        # 保存機能 (F10 - VIEWモードのみ) - 確認付き
+        if pyxel.btnp(pyxel.KEY_F10) and self.app_state == AppState.VIEW:
+            self.app_state = AppState.SAVE_CONFIRM
+            self.message = "Save to sprites.json? Y to confirm, N to cancel"
         
-        # Load functionality (F11 - VIEW mode only)
-        if pyxel.btnp(pyxel.KEY_F11) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
+        # 読み込み機能 (F11 - VIEWモードのみ)
+        if pyxel.btnp(pyxel.KEY_F11) and self.app_state == AppState.VIEW:
             self._load_from_json()
         
-        # Quit (F12 only - VIEW mode only) - now with confirmation
-        if pyxel.btnp(pyxel.KEY_F12) and not self.edit_mode and not self.save_confirm_mode and not self.quit_confirm_mode:
-            self.quit_confirm_mode = True
-            self.message = "Really quit? Press Y to confirm, N to cancel"
+        # 終了 (F12のみ - VIEWモードのみ) - 確認付き
+        if pyxel.btnp(pyxel.KEY_F12) and self.app_state == AppState.VIEW:
+            self.app_state = AppState.QUIT_CONFIRM
+            self.message = "Really quit? Y to confirm, N to cancel"
         
-        # Disabled ESC/Q quit for safety
+        # 安全のためESC/Q終了を無効化
         if pyxel.btnp(pyxel.KEY_Q) or pyxel.btnp(pyxel.KEY_ESCAPE):
-            if self.edit_mode:
-                self.message = "Cannot quit in EDIT mode - press F2 to exit EDIT first"
+            if self.app_state == AppState.EDIT:
+                self.message = "Cannot quit in EDIT mode - Exit EDIT with F2 first"
             else:
                 self.message = "Use F12 to quit (ESC/Q disabled for safety)"
     
-    # VIEWモード時の通常操作（カーソル移動・選択・モード切替など）を処理
-    def _handle_normal_input(self):
-        """Handle normal input (cursor movement, mode switching)"""
-        # Handle keyboard cursor movement (disabled in EDIT mode)
-        if not self.edit_mode:
-            old_cursor = self.cursor_sprite
+    # キーボードカーソル移動処理
+    def _handle_cursor_movement(self):
+        """キーボードカーソル移動処理（VIEWモードのみ）"""
+        if self.app_state != AppState.VIEW:
+            return
             
-            if pyxel.btnp(pyxel.KEY_LEFT):
-                self.cursor_sprite = (max(0, self.cursor_sprite[0] - self.SPRITE_SIZE), self.cursor_sprite[1])
-            if pyxel.btnp(pyxel.KEY_RIGHT):
-                self.cursor_sprite = (min(self.SPRITE_AREA_WIDTH - self.SPRITE_SIZE, self.cursor_sprite[0] + self.SPRITE_SIZE), self.cursor_sprite[1])
-            if pyxel.btnp(pyxel.KEY_UP):
-                self.cursor_sprite = (self.cursor_sprite[0], max(0, self.cursor_sprite[1] - self.SPRITE_SIZE))
-            if pyxel.btnp(pyxel.KEY_DOWN):
-                self.cursor_sprite = (self.cursor_sprite[0], min(self.SPRITE_AREA_HEIGHT - self.SPRITE_SIZE, self.cursor_sprite[1] + self.SPRITE_SIZE))
-            
-            # Auto-select sprite when cursor moves
-            if old_cursor != self.cursor_sprite:
-                self.selected_sprite = self.cursor_sprite
-                self.message = f"Auto-selected sprite at {self.cursor_sprite}"
+        old_cursor = self.cursor_sprite
         
-        # Update hover position
+        if pyxel.btnp(pyxel.KEY_LEFT):
+            self.cursor_sprite = (max(0, self.cursor_sprite[0] - self.SPRITE_SIZE), self.cursor_sprite[1])
+        if pyxel.btnp(pyxel.KEY_RIGHT):
+            self.cursor_sprite = (min(self.SPRITE_AREA_WIDTH - self.SPRITE_SIZE, self.cursor_sprite[0] + self.SPRITE_SIZE), self.cursor_sprite[1])
+        if pyxel.btnp(pyxel.KEY_UP):
+            self.cursor_sprite = (self.cursor_sprite[0], max(0, self.cursor_sprite[1] - self.SPRITE_SIZE))
+        if pyxel.btnp(pyxel.KEY_DOWN):
+            self.cursor_sprite = (self.cursor_sprite[0], min(self.SPRITE_AREA_HEIGHT - self.SPRITE_SIZE, self.cursor_sprite[1] + self.SPRITE_SIZE))
+        
+        # カーソル移動時に自動選択
+        if old_cursor != self.cursor_sprite:
+            self.selected_sprite = self.cursor_sprite
+            self.message = f"Auto-selected sprite at {self.cursor_sprite}"
+
+    # マウスホバー位置の更新処理
+    def _update_hover_position(self):
+        """マウスホバー位置の更新"""
         mouse_x = pyxel.mouse_x
         mouse_y = pyxel.mouse_y
         if (self.sprite_display_x <= mouse_x < self.sprite_display_x + self.SPRITE_AREA_WIDTH and
@@ -134,143 +186,171 @@ class SpriteDefiner:
             self.hover_sprite = (hover_x, hover_y)
         else:
             self.hover_sprite = None
-        
-        # Handle mouse click (disabled in EDIT mode)
-        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT) and self.hover_sprite and not self.edit_mode:
+
+    # マウス・キーボード選択処理
+    def _handle_selection_input(self):
+        """マウス・キーボード選択処理"""
+        # マウスクリック処理（EDITモードでは無効）
+        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT) and self.hover_sprite and self.app_state == AppState.VIEW:
             self.selected_sprite = self.hover_sprite
             self.cursor_sprite = self.hover_sprite
             self.message = f"Selected sprite at {self.hover_sprite}"
         
-        # Manual select with SPACE (now optional since auto-select is active)
-        if pyxel.btnp(pyxel.KEY_SPACE) and not self.edit_mode:
+        # SPACEキーでの手動選択（自動選択が有効なので任意）
+        if pyxel.btnp(pyxel.KEY_SPACE) and self.app_state == AppState.VIEW:
             self.selected_sprite = self.cursor_sprite
             self.message = f"Manually selected sprite at {self.cursor_sprite}"
-        
-        # Enter EDIT mode with F1
-        if pyxel.btnp(pyxel.KEY_F1) and not self.edit_mode:
-            self.edit_mode = True
+
+    # モード切替処理
+    def _handle_mode_switching(self):
+        """モード切替処理（F1/F2）"""
+        # F1でEDITモードに入る
+        if pyxel.btnp(pyxel.KEY_F1) and self.app_state == AppState.VIEW:
+            self.app_state = AppState.EDIT
             self.edit_locked_sprite = self.cursor_sprite
-            self.message = f"EDIT mode LOCKED on sprite ({self.cursor_sprite[0]}, {self.cursor_sprite[1]}) - Use commands: N, 1, 2, 3"
+            self.message = f"EDIT mode: Sprite ({self.cursor_sprite[0]}, {self.cursor_sprite[1]}) locked - Commands: N, 1, 2, 3"
         
-        # Exit EDIT mode with F2
-        if pyxel.btnp(pyxel.KEY_F2) and self.edit_mode:
-            # Auto-save when exiting EDIT mode
+        # F2でEDITモードを終了（コマンド入力モードでない場合のみ）
+        if pyxel.btnp(pyxel.KEY_F2) and self.app_state == AppState.EDIT and not self.command_mode:
+            # EDITモード終了時に自動保存
             self._save_to_json()
-            self.edit_mode = False
+            self.app_state = AppState.VIEW
             self.edit_locked_sprite = None
-            self.message = "VIEW mode - Auto-saved changes"
-        
-        # Handle edit mode commands
-        if self.edit_mode:
-            # F3 for manual save in EDIT mode
-            if pyxel.btnp(pyxel.KEY_F3):
-                self._save_to_json()
+            self.message = "VIEW mode - Changes auto-saved"
+
+    # EDITモード時のコマンド処理
+    def _handle_edit_commands(self):
+        """EDITモード時のコマンド処理"""
+        if self.app_state != AppState.EDIT:
+            return
             
-            if pyxel.btnp(pyxel.KEY_N):
-                self.command_mode = 'NAME'
-                self.command_input = ""
-                self.message = "Enter sprite name:"
-            elif pyxel.btnp(pyxel.KEY_1):
-                self.command_mode = 'DIC_1'
-                self.command_input = ""
-                self.message = "Enter ACT_NAME:"
-            elif pyxel.btnp(pyxel.KEY_2):
-                self.command_mode = 'DIC_2'
-                self.command_input = ""
-                self.message = "Enter FRAME_NUM:"
-            elif pyxel.btnp(pyxel.KEY_3):
-                self.command_mode = 'DIC_3'
-                self.command_input = ""
-                self.message = "Enter ANIM_SPEED:"
-            # Extension tags (4-8 keys)
-            elif pyxel.btnp(pyxel.KEY_4):
-                self.command_mode = 'EXT_1'
-                self.command_input = ""
-                self.message = "Enter EXT1:"
-            elif pyxel.btnp(pyxel.KEY_5):
-                self.command_mode = 'EXT_2'
-                self.command_input = ""
-                self.message = "Enter EXT2:"
-            elif pyxel.btnp(pyxel.KEY_6):
-                self.command_mode = 'EXT_3'
-                self.command_input = ""
-                self.message = "Enter EXT3:"
-            elif pyxel.btnp(pyxel.KEY_7):
-                self.command_mode = 'EXT_4'
-                self.command_input = ""
-                self.message = "Enter EXT4:"
-            elif pyxel.btnp(pyxel.KEY_8):
-                self.command_mode = 'EXT_5'
-                self.command_input = ""
-                self.message = "Enter EXT5:"
+        # F3でEDITモード中の手動保存
+        if pyxel.btnp(pyxel.KEY_F3):
+            self._save_to_json()
         
-        # Legacy naming mode
-        if pyxel.btnp(pyxel.KEY_RETURN) and self.selected_sprite and not self.edit_mode:
-            self.input_mode = True
+        if pyxel.btnp(pyxel.KEY_N):
+            self.command_mode = 'NAME'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter sprite name:"
+        elif pyxel.btnp(pyxel.KEY_1):
+            self.command_mode = 'DIC_1'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter ACT_NAME:"
+        elif pyxel.btnp(pyxel.KEY_2):
+            self.command_mode = 'DIC_2'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter FRAME_NUM:"
+        elif pyxel.btnp(pyxel.KEY_3):
+            self.command_mode = 'DIC_3'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter ANIM_SPEED:"
+        # 拡張タグ（4-8キー）
+        elif pyxel.btnp(pyxel.KEY_4):
+            self.command_mode = 'EXT_1'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter EXT1:"
+        elif pyxel.btnp(pyxel.KEY_5):
+            self.command_mode = 'EXT_2'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter EXT2:"
+        elif pyxel.btnp(pyxel.KEY_6):
+            self.command_mode = 'EXT_3'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter EXT3:"
+        elif pyxel.btnp(pyxel.KEY_7):
+            self.command_mode = 'EXT_4'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter EXT4:"
+        elif pyxel.btnp(pyxel.KEY_8):
+            self.command_mode = 'EXT_5'
+            self.command_input = ""
+            self.app_state = AppState.COMMAND_INPUT
+            self.message = "Enter EXT5:"
+
+    # レガシー入力モードの処理
+    def _handle_legacy_input_trigger(self):
+        """レガシー命名モードのトリガー処理（意図的使用のためShift+Enter）"""
+        if (pyxel.btnp(pyxel.KEY_RETURN) and pyxel.btn(pyxel.KEY_SHIFT) and 
+            self.selected_sprite and self.app_state == AppState.VIEW):
+            self.app_state = AppState.LEGACY_INPUT
             self.input_text = ""
             self.message = "Enter sprite name (legacy mode):"
+
+    # VIEWモード時の通常操作（カーソル移動・選択・モード切替など）を処理
+    def _handle_normal_input(self):
+        """通常入力処理（カーソル移動、モード切替）"""
+        self._handle_cursor_movement()
+        self._update_hover_position()
+        self._handle_selection_input()
+        self._handle_mode_switching()
+        
+        # EDITモードでのみ編集コマンドを処理
+        if self.app_state == AppState.EDIT:
+            self._handle_edit_commands()
+        
+        # VIEWモードでのみレガシー入力トリガーを処理
+        if self.app_state == AppState.VIEW:
+            self._handle_legacy_input_trigger()
     
-    # コマンド入力モード時のキー入力処理（名前やタグの編集）
-    def _handle_command_input(self):
-        """Handle command input mode"""
-        # Handle character input
+    # 共通の文字入力処理
+    def _handle_text_input_common(self, input_text):
+        """共通テキスト入力処理 - 更新されたテキストを返す"""
+        # 文字入力処理
         for i in range(26):  # A-Z
             if pyxel.btnp(pyxel.KEY_A + i):
                 if pyxel.btn(pyxel.KEY_SHIFT):
-                    self.command_input += chr(ord('A') + i)
+                    input_text += chr(ord('A') + i)
                 else:
-                    self.command_input += chr(ord('a') + i)
+                    input_text += chr(ord('a') + i)
         
-        # Numbers
+        # 数字
         for i in range(10):
             if pyxel.btnp(pyxel.KEY_0 + i):
-                self.command_input += str(i)
+                input_text += str(i)
         
-        # Underscore
+        # アンダースコア
         if pyxel.btnp(pyxel.KEY_MINUS) and pyxel.btn(pyxel.KEY_SHIFT):
-            self.command_input += "_"
+            input_text += "_"
         
-        # Backspace
+        # バックスペース
         if pyxel.btnp(pyxel.KEY_BACKSPACE):
-            if self.command_input:
-                self.command_input = self.command_input[:-1]
+            if input_text:
+                input_text = input_text[:-1]
         
-        # Confirm input
+        return input_text
+
+    # コマンド入力モード時のキー入力処理（名前やタグの編集）
+    def _handle_command_input(self):
+        """コマンド入力モード処理"""
+        # 共通テキスト入力処理を使用
+        self.command_input = self._handle_text_input_common(self.command_input)
+        
+        # 入力確定
         if pyxel.btnp(pyxel.KEY_RETURN):
             self._process_command()
         
-        # Cancel input
+        # 入力キャンセル
         if pyxel.btnp(pyxel.KEY_ESCAPE):
             self.command_mode = None
             self.command_input = ""
+            self.app_state = AppState.EDIT
             self.message = "Command cancelled"
     
     # 旧式の名前入力モードのキー入力処理
     def _handle_text_input(self):
-        """Handle legacy text input for sprite naming"""
-        # Handle character input
-        for i in range(26):  # A-Z
-            if pyxel.btnp(pyxel.KEY_A + i):
-                if pyxel.btn(pyxel.KEY_SHIFT):
-                    self.input_text += chr(ord('A') + i)
-                else:
-                    self.input_text += chr(ord('a') + i)
+        """レガシーテキスト入力処理（スプライト命名用）"""
+        # 共通テキスト入力処理を使用
+        self.input_text = self._handle_text_input_common(self.input_text)
         
-        # Numbers
-        for i in range(10):
-            if pyxel.btnp(pyxel.KEY_0 + i):
-                self.input_text += str(i)
-        
-        # Underscore
-        if pyxel.btnp(pyxel.KEY_MINUS) and pyxel.btn(pyxel.KEY_SHIFT):
-            self.input_text += "_"
-        
-        # Backspace
-        if pyxel.btnp(pyxel.KEY_BACKSPACE):
-            if self.input_text:
-                self.input_text = self.input_text[:-1]
-        
-        # Confirm input
+        # 入力確定
         if pyxel.btnp(pyxel.KEY_RETURN):
             if self.input_text and self.selected_sprite:
                 sprite_key = f"{self.selected_sprite[0]}_{self.selected_sprite[1]}"
@@ -282,132 +362,160 @@ class SpriteDefiner:
                 }
                 self.message = f"Added sprite '{self.input_text}'"
                 self.selected_sprite = None
-            self.input_mode = False
+            self.app_state = AppState.VIEW
             self.input_text = ""
         
-        # Cancel input
+        # 入力キャンセル
         if pyxel.btnp(pyxel.KEY_ESCAPE):
-            self.input_mode = False
+            self.app_state = AppState.VIEW
             self.input_text = ""
             self.message = "Cancelled"
     
+    # 共通のY/N確認入力処理
+    def _handle_confirmation_input(self, on_yes, on_no, cancel_message):
+        """共通のY/N確認入力処理"""
+        if pyxel.btnp(pyxel.KEY_Y):
+            on_yes()
+        elif pyxel.btnp(pyxel.KEY_N) or pyxel.btnp(pyxel.KEY_ESCAPE):
+            on_no()
+            self.message = cancel_message
+
     # F10保存時のY/N確認入力を処理
     def _handle_save_confirmation(self):
-        """Handle Y/N confirmation for save"""
-        if pyxel.btnp(pyxel.KEY_Y):
-            self.save_confirm_mode = False
+        """保存用Y/N確認処理"""
+        def on_yes():
+            self.app_state = AppState.VIEW
             self._save_to_json()
-        elif pyxel.btnp(pyxel.KEY_N) or pyxel.btnp(pyxel.KEY_ESCAPE):
-            self.save_confirm_mode = False
-            self.message = "Save cancelled"
+        
+        def on_no():
+            self.app_state = AppState.VIEW
+        
+        self._handle_confirmation_input(on_yes, on_no, "Save cancelled")
     
     # F12終了時のY/N確認入力を処理
     def _handle_quit_confirmation(self):
-        """Handle Y/N confirmation for quit"""
-        if pyxel.btnp(pyxel.KEY_Y):
+        """終了用Y/N確認処理"""
+        def on_yes():
             pyxel.quit()
-        elif pyxel.btnp(pyxel.KEY_N) or pyxel.btnp(pyxel.KEY_ESCAPE):
-            self.quit_confirm_mode = False
-            self.message = "Quit cancelled"
+        
+        def on_no():
+            self.app_state = AppState.VIEW
+        
+        self._handle_confirmation_input(on_yes, on_no, "Quit cancelled")
     
+    # 指定位置のスプライトを検索
+    def _find_sprite_at_position(self, x, y):
+        """指定位置のスプライトを検索"""
+        for key, data in self.sprites.items():
+            if data['x'] == x and data['y'] == y:
+                return key
+        return None
+
+    # スプライト名設定の処理
+    def _process_name_command(self, x, y):
+        """NAME コマンドの処理"""
+        if not self.command_input:
+            return
+            
+        # この位置の既存スプライトを検索してタグを保持
+        existing_tags = ['UNDEF']
+        sprite_key = f"{x}_{y}"  # 位置を一意キーとして使用
+        
+        for key, data in list(self.sprites.items()):
+            if data['x'] == x and data['y'] == y:
+                existing_tags = data['tags']  # 既存タグを保持
+                del self.sprites[key]
+                break
+        
+        # 同じ名前を許可するため位置ベースのキーでスプライトを追加
+        self.sprites[sprite_key] = {
+            'x': x,
+            'y': y,
+            'name': self.command_input,  # グループ名（複数スプライトで同じ名前が可能）
+            'tags': existing_tags
+        }
+        
+        # 編集済みスプライト名リストに追加
+        self._add_edited_sprite_name(self.command_input)
+        self.message = f"Set group name '{self.command_input}' to sprite ({x}, {y})"
+
+    # タグ設定の処理
+    def _process_tag_command(self, x, y):
+        """DIC/EXT タグコマンドの処理"""
+        sprite_key = self._find_sprite_at_position(x, y)
+        
+        if sprite_key:
+            # タグインデックスを計算 (DIC_1-3 → 0-2, EXT_1-5 → 3-7)
+            if self.command_mode.startswith('DIC_'):
+                tag_index = int(self.command_mode.split('_')[1]) - 1
+            elif self.command_mode.startswith('EXT_'):
+                tag_index = int(self.command_mode.split('_')[1]) + 2  # EXT_1 → index 3
+            
+            if self.command_input:
+                # タグリストに十分なスロットがあることを確認
+                while len(self.sprites[sprite_key]['tags']) <= tag_index:
+                    self.sprites[sprite_key]['tags'].append('UNDEF')
+                
+                # UNDEFが唯一のタグの場合は削除
+                if self.sprites[sprite_key]['tags'] == ['UNDEF']:
+                    self.sprites[sprite_key]['tags'] = []
+                
+                # タグを設定
+                if tag_index < len(self.sprites[sprite_key]['tags']):
+                    self.sprites[sprite_key]['tags'][tag_index] = self.command_input
+                else:
+                    self.sprites[sprite_key]['tags'].append(self.command_input)
+                
+                # 編集済みスプライト名リストに追加（現在のスプライト名を取得）
+                sprite_name = self.sprites[sprite_key].get('name', 'NONAME')
+                self._add_edited_sprite_name(sprite_name)
+                self.message = f"Set {self.command_mode} to '{self.command_input}'"
+            else:
+                self.message = "Cannot set empty tag"
+        else:
+            # この位置にスプライトがない場合は新規作成
+            sprite_key = f"{x}_{y}"
+            self.sprites[sprite_key] = {
+                'x': x,
+                'y': y,
+                'name': 'NONAME',
+                'tags': ['UNDEF']
+            }
+            self.message = "Created new sprite - Set NAME first"
+
     # コマンド入力完了時の処理（スプライト名やタグの設定など）
     def _process_command(self):
-        """Process the completed command"""
-        # Use locked sprite position in EDIT mode
+        """完了したコマンドの処理"""
+        # EDITモードではロックされたスプライト位置を使用
         x, y = self.edit_locked_sprite if self.edit_locked_sprite else self.cursor_sprite
         
         if self.command_mode == 'NAME':
-            if self.command_input:
-                # Find existing sprite at this position and preserve its tags
-                existing_tags = ['UNDEF']
-                sprite_key = f"{x}_{y}"  # Use position as unique key
-                
-                for key, data in list(self.sprites.items()):
-                    if data['x'] == x and data['y'] == y:
-                        existing_tags = data['tags']  # Preserve existing tags
-                        del self.sprites[key]
-                        break
-                
-                # Add sprite with position-based key to allow same names
-                self.sprites[sprite_key] = {
-                    'x': x,
-                    'y': y,
-                    'name': self.command_input,  # Group name (can be same for multiple sprites)
-                    'tags': existing_tags
-                }
-                
-                # Add to edited sprite names list
-                self._add_edited_sprite_name(self.command_input)
-                self.message = f"Set group name '{self.command_input}' for sprite at ({x}, {y})"
-            
+            self._process_name_command(x, y)
         elif self.command_mode in ['DIC_1', 'DIC_2', 'DIC_3', 'EXT_1', 'EXT_2', 'EXT_3', 'EXT_4', 'EXT_5']:
-            # Find existing sprite at cursor position
-            sprite_key = None
-            for key, data in self.sprites.items():
-                if data['x'] == x and data['y'] == y:
-                    sprite_key = key
-                    break
-            
-            if sprite_key:
-                # Calculate tag index (DIC_1-3 → 0-2, EXT_1-5 → 3-7)
-                if self.command_mode.startswith('DIC_'):
-                    tag_index = int(self.command_mode.split('_')[1]) - 1
-                elif self.command_mode.startswith('EXT_'):
-                    tag_index = int(self.command_mode.split('_')[1]) + 2  # EXT_1 → index 3
-                
-                if self.command_input:
-                    # Ensure tags list has enough slots
-                    while len(self.sprites[sprite_key]['tags']) <= tag_index:
-                        self.sprites[sprite_key]['tags'].append('UNDEF')
-                    
-                    # Remove UNDEF if it's the only tag
-                    if self.sprites[sprite_key]['tags'] == ['UNDEF']:
-                        self.sprites[sprite_key]['tags'] = []
-                    
-                    # Set the tag
-                    if tag_index < len(self.sprites[sprite_key]['tags']):
-                        self.sprites[sprite_key]['tags'][tag_index] = self.command_input
-                    else:
-                        self.sprites[sprite_key]['tags'].append(self.command_input)
-                    
-                    # Add to edited sprite names list (get current sprite name)
-                    sprite_name = self.sprites[sprite_key].get('name', 'NONAME')
-                    self._add_edited_sprite_name(sprite_name)
-                    self.message = f"Set {self.command_mode} to '{self.command_input}'"
-                else:
-                    self.message = "Tag cannot be empty"
-            else:
-                # Create new sprite if none exists at this position
-                sprite_key = f"{x}_{y}"
-                self.sprites[sprite_key] = {
-                    'x': x,
-                    'y': y,
-                    'name': 'NONAME',
-                    'tags': ['UNDEF']
-                }
-                self.message = "Created new sprite - set NAME first"
+            self._process_tag_command(x, y)
         
-        # Reset command mode
+        # コマンドモードをリセット
         self.command_mode = None
         self.command_input = ""
+        self.app_state = AppState.EDIT
     
     # 最近編集したスプライト名リストを管理（重複排除・最大6件）
     def _add_edited_sprite_name(self, sprite_name):
-        """Add sprite name to recently edited list"""
-        # Remove if already exists to avoid duplicates
+        """最近編集されたリストにスプライト名を追加"""
+        # 重複を避けるため既存があれば削除
         if sprite_name in self.edited_sprite_names:
             self.edited_sprite_names.remove(sprite_name)
         
-        # Add to end
+        # 末尾に追加
         self.edited_sprite_names.append(sprite_name)
         
-        # Keep only last 6 entries
+        # 最新6件のみを保持
         if len(self.edited_sprite_names) > 6:
             self.edited_sprite_names = self.edited_sprite_names[-6:]
     
     # スプライト情報をJSONファイルに保存
     def _save_to_json(self):
-        """Save sprites to JSON file"""
+        """スプライトをJSONファイルに保存"""
         sprite_data = {
             "meta": {
                 "sprite_size": self.SPRITE_SIZE,
@@ -430,30 +538,25 @@ class SpriteDefiner:
             with open("sprites.json", "w", encoding="utf-8") as f:
                 json.dump(sprite_data, f, indent=2, ensure_ascii=False)
             
-            # Different messages based on context
-            # （状況に応じて異なるメッセージを表示）
-            if self.edit_mode:
+            # 状況に応じて異なるメッセージを表示
+            if self.app_state == AppState.EDIT:
                 self.message = f"Saved {len(self.sprites)} sprites (EDIT mode active)"
             else:
                 self.message = f"F10: Saved {len(self.sprites)} sprites to sprites.json"
         except Exception as e:
-            # Error message if saving fails
-            # （保存失敗時のエラーメッセージ）
-            self.message = f"Error saving: {e}"
+            # 保存失敗時のエラーメッセージ
+            self.message = f"Save error: {e}"
     
     def _load_from_json(self):
-        """Load sprites from JSON file
-        JSONファイルからスプライト情報を読み込む"""
+        """JSONファイルからスプライトを読み込み"""
         try:
             with open("sprites.json", "r", encoding="utf-8") as f:
                 sprite_data = json.load(f)
             
-            # Clear existing sprites
-            # （既存のスプライト情報をクリア）
+            # 既存のスプライト情報をクリア
             self.sprites = {}
             
-            # Load sprites from JSON
-            # （JSONからスプライト情報を読み込む）
+            # JSONからスプライト情報を読み込む
             if "sprites" in sprite_data:
                 for key, data in sprite_data["sprites"].items():
                     self.sprites[key] = {
@@ -465,72 +568,66 @@ class SpriteDefiner:
                     
             self.message = f"F11: Loaded {len(self.sprites)} sprites from sprites.json"
         except FileNotFoundError:
-            # No JSON file found
-            # （JSONファイルが存在しない場合のメッセージ）
-            self.message = "F11: No sprites.json file found"
+            # JSONファイルが存在しない場合のメッセージ
+            self.message = "F11: sprites.json file not found"
         except Exception as e:
-            # Error message if loading fails
-            # （読み込み失敗時のエラーメッセージ）
-            self.message = f"Error loading: {e}"
+            # 読み込み失敗時のエラーメッセージ
+            self.message = f"Load error: {e}"
     
     def draw(self):
-        """Draw the application
-        アプリケーション全体の描画処理"""
+        """アプリケーション全体の描画処理"""
         pyxel.cls(pyxel.COLOR_BLACK)
         
-        # Draw sprite sheet
-        # （スプライトシートの描画）
+        # スプライトシートの描画
         self._draw_sprite_sheet()
         
-        # Draw grid
-        # （グリッドの描画）
+        # グリッドの描画
         self._draw_grid()
         
-        # Draw hover highlight
-        # （マウスホバー時のハイライト描画）
+        # マウスホバー時のハイライト描画
         self._draw_hover()
         
-        # Draw cursor
+        # カーソル描画
         self._draw_cursor()
         
-        # Draw selection highlight
+        # 選択ハイライト描画
         self._draw_selection()
         
-        # Draw mouse cursor
+        # マウスカーソル描画
         self._draw_mouse_cursor()
         
-        # Draw status area below grid
+        # グリッド下のステータスエリア描画
         status_y = self.sprite_display_y + self.SPRITE_AREA_HEIGHT + 10
         self._draw_status_area(status_y)
         
-        # Draw right panel
+        # 右パネル描画
         sprite_list_x = self.sprite_display_x + self.SPRITE_AREA_WIDTH + 20
         self._draw_dynamic_info(sprite_list_x)
         
-        # Draw recent edited sprite names (always visible at far right)
-        recent_names_x = sprite_list_x + 100  # Position at far right (moved 20px left)
+        # 最近編集されたスプライト名描画（右端に常時表示）
+        recent_names_x = sprite_list_x + 100  # 右端に配置（20px左に移動）
         self._draw_recent_sprite_names(recent_names_x)
         
-        # Controls (bottom)
+        # コントロール（下部）
         controls_y = self.HEIGHT - 25
-        if self.edit_mode:
-            pyxel.text(10, controls_y, "EDIT MODE ACTIVE - Movement LOCKED | F2: Exit+Save | F3: Save", pyxel.COLOR_RED)
+        if self.app_state == AppState.EDIT:
+            pyxel.text(10, controls_y, "EDIT mode active - movement locked | F2: Exit+Save | F3: Save", pyxel.COLOR_RED)
         else:
-            pyxel.text(10, controls_y, "Arrow Keys: Auto-Select | F1: EDIT | F10: Save | F11: Load | F12: Quit", pyxel.COLOR_PINK)
+            pyxel.text(10, controls_y, "Arrow Keys: Auto-Select | F1: EDIT | F10: Save | F11: Load | F12: Quit | Shift+Enter: Legacy", pyxel.COLOR_PINK)
         pyxel.text(10, controls_y + 8, f"Cursor: ({self.cursor_sprite[0]}, {self.cursor_sprite[1]})", pyxel.COLOR_GRAY)
     
     def _draw_sprite_sheet(self):
-        """Draw the sprite sheet from image bank 0"""
+        """イメージバンク0からスプライトシートを描画"""
         pyxel.blt(self.sprite_display_x, self.sprite_display_y, 
                  0, 0, 0, 
                  self.SPRITE_AREA_WIDTH, self.SPRITE_AREA_HEIGHT)
     
     def _draw_grid(self):
-        """Draw grid lines over the sprite sheet"""
-        # Choose grid color based on mode
-        grid_color = self.GRID_COLOR_EDIT if self.edit_mode else self.GRID_COLOR_VIEW
+        """スプライトシート上にグリッド線を描画"""
+        # モードに基づいてグリッド色を選択（EDITとCOMMAND_INPUTの両方でEDIT色を使用）
+        grid_color = self.GRID_COLOR_EDIT if self.app_state in [AppState.EDIT, AppState.COMMAND_INPUT] else self.GRID_COLOR_VIEW
         
-        # Vertical lines
+        # 垂直線
         for x in range(0, self.SPRITE_AREA_WIDTH + 1, self.SPRITE_SIZE):
             line_x = self.sprite_display_x + x
             pyxel.line(
@@ -539,7 +636,7 @@ class SpriteDefiner:
                 grid_color
             )
         
-        # Horizontal lines
+        # 水平線
         for y in range(0, self.SPRITE_AREA_HEIGHT + 1, self.SPRITE_SIZE):
             line_y = self.sprite_display_y + y
             pyxel.line(
@@ -549,7 +646,7 @@ class SpriteDefiner:
             )
     
     def _draw_hover(self):
-        """Draw hover highlight"""
+        """ホバーハイライトを描画"""
         if self.hover_sprite:
             x, y = self.hover_sprite
             rect_x = self.sprite_display_x + x
@@ -557,14 +654,14 @@ class SpriteDefiner:
             pyxel.rectb(rect_x, rect_y, self.SPRITE_SIZE, self.SPRITE_SIZE, self.HOVER_COLOR)
     
     def _draw_cursor(self):
-        """Draw keyboard cursor"""
-        # Choose cursor color based on mode
-        cursor_color = self.CURSOR_COLOR_EDIT if self.edit_mode else self.CURSOR_COLOR_VIEW
+        """キーボードカーソルを描画"""
+        # モードに基づいてカーソル色を選択（EDITとCOMMAND_INPUTの両方でEDIT色を使用）
+        cursor_color = self.CURSOR_COLOR_EDIT if self.app_state in [AppState.EDIT, AppState.COMMAND_INPUT] else self.CURSOR_COLOR_VIEW
         
-        # In EDIT mode, show locked sprite position; in VIEW mode, show current cursor
-        if self.edit_mode and self.edit_locked_sprite:
+        # EDITモードではロックされたスプライト位置を表示、VIEWモードでは現在のカーソルを表示
+        if self.app_state == AppState.EDIT and self.edit_locked_sprite:
             x, y = self.edit_locked_sprite
-            # Draw thicker cursor for locked sprite
+            # ロックされたスプライト用に太いカーソルを描画
             rect_x = self.sprite_display_x + x
             rect_y = self.sprite_display_y + y
             pyxel.rectb(rect_x, rect_y, self.SPRITE_SIZE, self.SPRITE_SIZE, cursor_color)
@@ -578,7 +675,7 @@ class SpriteDefiner:
             pyxel.rectb(rect_x + 1, rect_y + 1, self.SPRITE_SIZE - 2, self.SPRITE_SIZE - 2, cursor_color)
     
     def _draw_selection(self):
-        """Draw selection highlight"""
+        """選択ハイライトを描画"""
         if self.selected_sprite:
             x, y = self.selected_sprite
             rect_x = self.sprite_display_x + x
@@ -586,7 +683,7 @@ class SpriteDefiner:
             pyxel.rectb(rect_x, rect_y, self.SPRITE_SIZE, self.SPRITE_SIZE, self.SELECT_COLOR)
     
     def _draw_mouse_cursor(self):
-        """Draw custom mouse cursor"""
+        """カスタムマウスカーソルを描画"""
         mouse_x = pyxel.mouse_x
         mouse_y = pyxel.mouse_y
         pyxel.line(mouse_x - 3, mouse_y, mouse_x + 3, mouse_y, pyxel.COLOR_WHITE)
@@ -594,48 +691,50 @@ class SpriteDefiner:
         pyxel.pset(mouse_x, mouse_y, pyxel.COLOR_RED)
     
     def _draw_status_area(self, y_pos):
-        """Draw status area below the grid"""
-        # Mode indicator with clear next action
-        if self.edit_mode:
+        """グリッド下のステータスエリアを描画"""
+        # 次のアクションを明確にしたモードインジケータ
+        if self.app_state == AppState.EDIT:
             if self.edit_locked_sprite:
-                lock_info = f" LOCKED ({self.edit_locked_sprite[0]}, {self.edit_locked_sprite[1]})"
+                lock_info = f" Locked ({self.edit_locked_sprite[0]}, {self.edit_locked_sprite[1]})"
                 pyxel.text(10, y_pos, f"F2>VIEW [EDIT{lock_info}]", pyxel.COLOR_RED)
             else:
                 pyxel.text(10, y_pos, "F2>VIEW [EDIT]", pyxel.COLOR_RED)
         else:
             pyxel.text(10, y_pos, "F1>EDIT [VIEW]", pyxel.COLOR_GREEN)
         
-        # Command options (only in EDIT mode)
-        if self.edit_mode and not self.command_mode:
-            pyxel.text(10, y_pos + 12, "Commands: [N:NAME] [1-3:DIC] [4-8:EXT] [F3:SAVE]", pyxel.COLOR_CYAN)
+        # コマンドオプション（EDITモードのみ）
+        if self.app_state == AppState.EDIT and not self.command_mode:
+            pyxel.text(10, y_pos + 12, "Commands: [N:Name] [1-3:DIC] [4-8:EXT] [F3:Save]", pyxel.COLOR_CYAN)
         
-        # Command input prompt
-        if self.command_mode:
+        # コマンド入力プロンプト
+        if self.app_state == AppState.COMMAND_INPUT:
             prompt_text = f"{self.command_mode}> {self.command_input}_"
             pyxel.text(10, y_pos + 24, prompt_text, pyxel.COLOR_YELLOW)
         
-        # Save confirmation prompt
-        if self.save_confirm_mode:
-            pyxel.text(10, y_pos + 24, "Save to sprites.json? [Y]es / [N]o / [ESC]ape", pyxel.COLOR_YELLOW)
+        # 保存確認プロンプト
+        if self.app_state == AppState.SAVE_CONFIRM:
+            pyxel.text(10, y_pos + 24, "Save to sprites.json? [Y]Yes / [N]No / [ESC]Cancel", pyxel.COLOR_YELLOW)
         
-        # Quit confirmation prompt
-        if self.quit_confirm_mode:
-            pyxel.text(10, y_pos + 24, "Really quit? [Y]es / [N]o / [ESC]ape", pyxel.COLOR_RED)
+        # 終了確認プロンプト
+        if self.app_state == AppState.QUIT_CONFIRM:
+            pyxel.text(10, y_pos + 24, "Really quit? [Y]Yes / [N]No / [ESC]Cancel", pyxel.COLOR_RED)
         
-        # Message
-        message_color = pyxel.COLOR_YELLOW if self.save_confirm_mode or self.quit_confirm_mode else pyxel.COLOR_WHITE
+        # メッセージ
+        message_color = pyxel.COLOR_YELLOW if self.app_state in [AppState.SAVE_CONFIRM, AppState.QUIT_CONFIRM] else pyxel.COLOR_WHITE
         pyxel.text(10, y_pos + 36, self.message, message_color)
     
-    def _draw_dynamic_info(self, x_pos):
-        """Draw dynamic sprite information based on cursor position"""
-        # Show locked sprite info in EDIT mode, cursor info in VIEW mode
-        if self.edit_mode and self.edit_locked_sprite:
+    # 現在の対象スプライト情報を取得
+    def _get_current_sprite_info(self):
+        """現在のスプライト情報を取得（位置、名前、タグ）"""
+        # EDITモードではロックされたスプライト情報を表示、VIEWモードではカーソル情報を表示
+        if self.app_state == AppState.EDIT and self.edit_locked_sprite:
             x, y = self.edit_locked_sprite
         else:
             x, y = self.cursor_sprite
+        
         sprite_number = self._get_sprite_number(x, y)
         
-        # Find sprite data by cursor position
+        # カーソル位置でスプライトデータを検索
         sprite_name = "NONAME"
         sprite_tags = ["UNDEF"]
         
@@ -645,13 +744,19 @@ class SpriteDefiner:
                 sprite_tags = data['tags']
                 break
         
-        # Header - always visible
-        pyxel.text(x_pos, self.sprite_display_y, "SPRITE DETAILS", pyxel.COLOR_CYAN)
+        return x, y, sprite_number, sprite_name, sprite_tags
+
+    def _draw_dynamic_info(self, x_pos):
+        """カーソル位置に基づく動的スプライト情報を描画"""
+        x, y, sprite_number, sprite_name, sprite_tags = self._get_current_sprite_info()
+        
+        # ヘッダー - 常時表示
+        pyxel.text(x_pos, self.sprite_display_y, "Sprite Details", pyxel.COLOR_CYAN)
         pyxel.text(x_pos, self.sprite_display_y + 12, f"Position: ({x}, {y})", pyxel.COLOR_WHITE)
         pyxel.text(x_pos, self.sprite_display_y + 22, f"Number: #{sprite_number}", pyxel.COLOR_WHITE)
         pyxel.text(x_pos, self.sprite_display_y + 32, f"N]Name: {sprite_name}", pyxel.COLOR_YELLOW)
         
-        # DIC information
+        # DIC情報
         act_name = sprite_tags[0] if len(sprite_tags) > 0 and sprite_tags[0] != 'UNDEF' else "NO_ACT"
         frame_num = sprite_tags[1] if len(sprite_tags) > 1 else "NO_FRAME"
         anim_speed = sprite_tags[2] if len(sprite_tags) > 2 else "NO_SPEED"
@@ -660,7 +765,7 @@ class SpriteDefiner:
         pyxel.text(x_pos, self.sprite_display_y + 52, f"2]FRAME_NUM: {frame_num}", pyxel.COLOR_GREEN)
         pyxel.text(x_pos, self.sprite_display_y + 62, f"3]ANIM_SPEED: {anim_speed}", pyxel.COLOR_GREEN)
         
-        # EXT information
+        # EXT情報
         ext1 = sprite_tags[3] if len(sprite_tags) > 3 else "NO_EXT"
         ext2 = sprite_tags[4] if len(sprite_tags) > 4 else "NO_EXT"
         ext3 = sprite_tags[5] if len(sprite_tags) > 5 else "NO_EXT"
@@ -673,26 +778,26 @@ class SpriteDefiner:
         pyxel.text(x_pos, self.sprite_display_y + 102, f"7]EXT4: {ext4}", pyxel.COLOR_GRAY)
         pyxel.text(x_pos, self.sprite_display_y + 112, f"8]EXT5: {ext5}", pyxel.COLOR_GRAY)
         
-        # Mode indicator
-        mode_text = "EDIT" if self.edit_mode else "VIEW"
-        mode_color = pyxel.COLOR_RED if self.edit_mode else pyxel.COLOR_GREEN
+        # モードインジケータ
+        mode_text = "EDIT" if self.app_state == AppState.EDIT else "VIEW"
+        mode_color = pyxel.COLOR_RED if self.app_state == AppState.EDIT else pyxel.COLOR_GREEN
         pyxel.text(x_pos, self.sprite_display_y + 124, f"Mode: {mode_text}", mode_color)
         
-        # Content based on mode
-        if self.edit_mode:
+        # モードに基づくコンテンツ
+        if self.app_state == AppState.EDIT:
             self._draw_edit_content(x_pos, sprite_tags)
         else:
             self._draw_view_content(x_pos)
     
     def _draw_edit_content(self, x_pos, sprite_tags):
-        """Draw edit mode content"""
-        start_y = self.sprite_display_y + 138  # Moved down to accommodate DIC+EXT display
+        """編集モードのコンテンツを描画"""
+        start_y = self.sprite_display_y + 138  # DIC+EXT表示に対応するため下に移動
         
         pyxel.text(x_pos, start_y, "Current Tags:", pyxel.COLOR_WHITE)
         
         tag_y = 12
         if sprite_tags and sprite_tags != ['UNDEF']:
-            for i, tag in enumerate(sprite_tags[:3]):  # Show max 3 tags
+            for i, tag in enumerate(sprite_tags[:3]):  # 最大3つのタグを表示
                 tag_name = f"DIC_{i+1}: {tag}"
                 pyxel.text(x_pos, start_y + tag_y, tag_name, pyxel.COLOR_GREEN)
                 tag_y += 10
@@ -700,32 +805,32 @@ class SpriteDefiner:
             pyxel.text(x_pos, start_y + tag_y, "No tags defined", pyxel.COLOR_GRAY)
     
     def _draw_view_content(self, x_pos):
-        """Draw view mode content - simple status"""
-        start_y = self.sprite_display_y + 138  # Moved down to accommodate DIC+EXT display
+        """ビューモードのコンテンツを描画 - シンプルなステータス"""
+        start_y = self.sprite_display_y + 138  # DIC+EXT表示に対応するため下に移動
         
-        pyxel.text(x_pos, start_y, f"Total sprites: {len(self.sprites)}", pyxel.COLOR_CYAN)
-        pyxel.text(x_pos, start_y + 12, "Press F1 to edit mode", pyxel.COLOR_GRAY)
+        pyxel.text(x_pos, start_y, f"Total Sprites: {len(self.sprites)}", pyxel.COLOR_CYAN)
+        pyxel.text(x_pos, start_y + 12, "F1 to edit mode", pyxel.COLOR_GRAY)
     
     def _draw_recent_sprite_names(self, x_pos):
-        """Draw recently edited sprite names at far right (always visible)"""
+        """右端に最近編集されたスプライト名を描画（常時表示）"""
         start_y = self.sprite_display_y
         
-        # Header with edit mode indicator
-        if self.edit_mode:
-            pyxel.text(x_pos, start_y, "RECENT EDITS", pyxel.COLOR_RED)
+        # 編集モードインジケータ付きヘッダー
+        if self.app_state == AppState.EDIT:
+            pyxel.text(x_pos, start_y, "Recent Edit", pyxel.COLOR_RED)
         else:
-            pyxel.text(x_pos, start_y, "Recent Edits", pyxel.COLOR_CYAN)
+            pyxel.text(x_pos, start_y, "Recent Edit", pyxel.COLOR_CYAN)
         
         pyxel.text(x_pos, start_y + 10, f"({len(self.edited_sprite_names)})", pyxel.COLOR_GRAY)
         
         if self.edited_sprite_names:
-            # Show last 6 sprite names
+            # 最新6つのスプライト名を表示
             y_offset = 22
             for i, sprite_name in enumerate(self.edited_sprite_names[-6:]):
-                # Highlight most recent in yellow, others in white
+                # 最新を黄色でハイライト、他は白
                 color = pyxel.COLOR_YELLOW if i == len(self.edited_sprite_names[-6:]) - 1 else pyxel.COLOR_WHITE
                 
-                # Truncate long names to fit
+                # 長い名前は切り詰めて表示
                 display_name = sprite_name[:8] + "..." if len(sprite_name) > 8 else sprite_name
                 pyxel.text(x_pos, start_y + y_offset, display_name, color)
                 y_offset += 10
@@ -733,7 +838,7 @@ class SpriteDefiner:
             pyxel.text(x_pos, start_y + 22, "None yet", pyxel.COLOR_GRAY)
     
     def _get_sprite_number(self, x, y):
-        """Calculate sprite number based on position"""
+        """位置に基づいてスプライト番号を計算"""
         grid_x = x // self.SPRITE_SIZE
         grid_y = y // self.SPRITE_SIZE
         return grid_y * (self.SPRITE_AREA_WIDTH // self.SPRITE_SIZE) + grid_x

@@ -118,6 +118,13 @@ The game features a sophisticated multi-stage enemy attack system with the follo
 - Configuration constants centralized in `Config.py`
 - Game state variables managed in `GameState.py`
 
+### ⚠️ **重要開発方針** - JSON設定の優先
+- **JSONファイル（sprites.json）のアニメーション設定が最優先**
+- ハードコーディングされたフレーム数よりもJSON設定を優先する
+- JSON の tags[2] がアニメーション持続フレーム数を定義
+- 新機能追加時は必ずJSON設定に対応したタイマー制御を実装
+- 例：エグゾースト、弾丸、エフェクト等の全アニメーション
+
 ### Game Balance
 - Enemy shooting probability increases as fewer enemies remain
 - Player has invincibility frames after being hit with visual feedback

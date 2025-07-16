@@ -4,7 +4,7 @@ import pyxel
 import Common
 import Config
 import GameState
-from SpriteManager import SprList
+from SpriteManager import SprList, sprite_manager
 import math
 from ExplodeManager import ExpType
 
@@ -43,6 +43,7 @@ class Player:
 
         self.ExtIndex = 0
         self.ExtSpr = "EXT01"  # Exhaust Sprite Name
+        self.ExtTimer = 0  # Exhaust Animation Timer
 
         self.MuzlFlash = -1  # Muzzle Flash List
 
@@ -53,12 +54,18 @@ class Player:
         if GameState.StopTimer > 0:
             return  
         
-        #Exhaust Animation --------
+        #Exhaust Animation -------- JSON駆動の持続時間制御
         self.ExtSpr = ExtNames[self.ExtIndex]
         
-        self.ExtIndex += 1
-        if self.ExtIndex >= ExtMax:
-            self.ExtIndex = 0
+        # JSON設定に基づくタイマー制御
+        exhaust_duration = sprite_manager.get_exhaust_animation_duration()
+        self.ExtTimer += 1
+        
+        if self.ExtTimer >= exhaust_duration:
+            self.ExtTimer = 0
+            self.ExtIndex += 1
+            if self.ExtIndex >= ExtMax:
+                self.ExtIndex = 0
 
         #Movement -----------
         self.SprName = "TOP"
@@ -119,16 +126,18 @@ class Player:
         else:
             pyxel.pal()  # クールタイム終了時はパレットをリセット
 
-        #Player Ship
+        #Player Ship - JSON駆動のスプライト取得
+        player_sprite = sprite_manager.get_player_sprite(self.SprName)
         pyxel.blt(self.x, self.y, Config.TILE_BANK0,
-                SprList[self.SprName].x, SprList[self.SprName].y, self.width, self.height, pyxel.COLOR_BLACK)
+                player_sprite.x, player_sprite.y, self.width, self.height, pyxel.COLOR_BLACK)
 
         #デフォルトパレットに戻す
         pyxel.pal()
         
-        #Exhaust
+        #Exhaust - JSON駆動のエグゾーストスプライト取得
+        exhaust_sprite = sprite_manager.get_exhaust_sprite(self.ExtIndex)
         pyxel.blt(self.x, self.y+8, Config.TILE_BANK0,
-            SprList[self.ExtSpr].x, SprList[self.ExtSpr].y, self.width, self.height, pyxel.COLOR_BLACK)
+            exhaust_sprite.x, exhaust_sprite.y, self.width, self.height, pyxel.COLOR_BLACK)
 
         #Muzzle Flash
         if self.MuzlFlash >= 0:

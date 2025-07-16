@@ -35,6 +35,19 @@ class SpriteDefiner:
         self.RESOURCE_FILE = "./my_resource.pyxres"
         self.SPRITE_SIZE = 8
         
+        # スプライトフィールド定義 - キーワードベース管理
+        self.SPRITE_FIELDS = {
+            'NAME': 'NAME',
+            'ACT_NAME': 'ACT_NAME', 
+            'FRAME_NUM': 'FRAME_NUM',
+            'ANIM_SPD': 'ANIM_SPD',
+            'EXT1': 'EXT1',
+            'EXT2': 'EXT2', 
+            'EXT3': 'EXT3',
+            'EXT4': 'EXT4',
+            'EXT5': 'EXT5'
+        }
+        
         # UI設定
         self.GRID_COLOR_VIEW = pyxel.COLOR_WHITE
         self.GRID_COLOR_EDIT = pyxel.COLOR_RED
@@ -45,8 +58,8 @@ class SpriteDefiner:
         self.SPRITE_AREA_WIDTH = 256  # Full 256x256 sprite sheet
         self.SPRITE_AREA_HEIGHT = 256
         
-        # 状態管理
-        self.sprites = {}  # {name: {'x': x, 'y': y, 'tags': []}}
+        # 状態管理 - 新フォーマット: キーワードフィールド
+        self.sprites = {}  # {key: {'x': x, 'y': y, 'NAME': name, 'ACT_NAME': val, 'FRAME_NUM': val, ...}}
         self.selected_sprite = None  # (x, y)
         self.cursor_sprite = (0, 0)  # 現在のカーソル位置 (x, y)
         self.hover_sprite = None  # マウスホバー位置 (x, y)
@@ -57,9 +70,9 @@ class SpriteDefiner:
         # アプリケーション状態管理
         self.app_state = AppState.VIEW  # 現在の状態
         
-        # 入力モード
+        # 入力モード - キーワードフィールド対応
         self.input_text = ""  # レガシーテキスト入力
-        self.command_mode = None  # 現在のコマンド: None, 'NAME', 'DIC_1', 'DIC_2', 'DIC_3'
+        self.command_mode = None  # 現在のコマンド: None, 'NAME', 'ACT_NAME', 'FRAME_NUM', 'ANIM_SPD', 'EXT1'-'EXT5'
         self.command_input = ""  # 現在のコマンド用入力テキスト
         self.edit_locked_sprite = None  # 編集中にロックされたスプライト位置
         
@@ -92,15 +105,21 @@ class SpriteDefiner:
             # 既存のスプライトをクリア
             self.sprites = {}
             
-            # JSONからスプライトを読み込み
+            # JSONからスプライトを読み込み（新フォーマット: キーワードフィールド）
             if "sprites" in sprite_data:
                 for key, data in sprite_data["sprites"].items():
-                    self.sprites[key] = {
+                    sprite_entry = {
                         'x': data['x'],
                         'y': data['y'], 
-                        'name': data.get('name', 'NONAME'),
-                        'tags': data.get('tags', ['UNDEF'])
+                        'NAME': data.get('NAME', 'NONAME')
                     }
+                    
+                    # キーワードフィールドをコピー
+                    for field_key in self.SPRITE_FIELDS.values():
+                        if field_key != 'NAME' and field_key in data:
+                            sprite_entry[field_key] = data[field_key]
+                    
+                    self.sprites[key] = sprite_entry
             
             # 起動メッセージ
             self.message = f"Startup: Auto-loaded {len(self.sprites)} sprites from sprites.json"
@@ -234,43 +253,43 @@ class SpriteDefiner:
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter sprite name:"
         elif pyxel.btnp(pyxel.KEY_1):
-            self.command_mode = 'DIC_1'
+            self.command_mode = 'ACT_NAME'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter ACT_NAME:"
         elif pyxel.btnp(pyxel.KEY_2):
-            self.command_mode = 'DIC_2'
+            self.command_mode = 'FRAME_NUM'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter FRAME_NUM:"
         elif pyxel.btnp(pyxel.KEY_3):
-            self.command_mode = 'DIC_3'
+            self.command_mode = 'ANIM_SPD'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
-            self.message = "Enter ANIM_SPEED:"
-        # 拡張タグ（4-8キー）
+            self.message = "Enter ANIM_SPD:"
+        # 拡張フィールド（4-8キー）
         elif pyxel.btnp(pyxel.KEY_4):
-            self.command_mode = 'EXT_1'
+            self.command_mode = 'EXT1'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter EXT1:"
         elif pyxel.btnp(pyxel.KEY_5):
-            self.command_mode = 'EXT_2'
+            self.command_mode = 'EXT2'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter EXT2:"
         elif pyxel.btnp(pyxel.KEY_6):
-            self.command_mode = 'EXT_3'
+            self.command_mode = 'EXT3'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter EXT3:"
         elif pyxel.btnp(pyxel.KEY_7):
-            self.command_mode = 'EXT_4'
+            self.command_mode = 'EXT4'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter EXT4:"
         elif pyxel.btnp(pyxel.KEY_8):
-            self.command_mode = 'EXT_5'
+            self.command_mode = 'EXT5'
             self.command_input = ""
             self.app_state = AppState.COMMAND_INPUT
             self.message = "Enter EXT5:"
@@ -357,8 +376,8 @@ class SpriteDefiner:
                 self.sprites[sprite_key] = {
                     'x': self.selected_sprite[0],
                     'y': self.selected_sprite[1],
-                    'name': self.input_text,
-                    'tags': ['UNDEF']
+                    'NAME': self.input_text,
+                    'ACT_NAME': 'UNDEF'  # 新フォーマット: デフォルト値
                 }
                 self.message = f"Added sprite '{self.input_text}'"
                 self.selected_sprite = None
@@ -417,73 +436,68 @@ class SpriteDefiner:
         if not self.command_input:
             return
             
-        # この位置の既存スプライトを検索してタグを保持
-        existing_tags = ['UNDEF']
+        # この位置の既存スプライトを検索して既存フィールドを保持
+        existing_fields = {}
         sprite_key = f"{x}_{y}"  # 位置を一意キーとして使用
         
         for key, data in list(self.sprites.items()):
             if data['x'] == x and data['y'] == y:
-                existing_tags = data['tags']  # 既存タグを保持
+                # 既存のキーワードフィールドを保持
+                for field_key in self.SPRITE_FIELDS.values():
+                    if field_key != 'name' and field_key in data:
+                        existing_fields[field_key] = data[field_key]
                 del self.sprites[key]
                 break
         
-        # 同じ名前を許可するため位置ベースのキーでスプライトを追加
-        self.sprites[sprite_key] = {
+        # 新しいスプライトエントリを作成
+        sprite_entry = {
             'x': x,
             'y': y,
-            'name': self.command_input,  # グループ名（複数スプライトで同じ名前が可能）
-            'tags': existing_tags
+            'NAME': self.command_input  # グループ名（複数スプライトで同じ名前が可能）
         }
+        
+        # 既存フィールドをコピー
+        sprite_entry.update(existing_fields)
+        
+        self.sprites[sprite_key] = sprite_entry
         
         # 編集済みスプライト名リストに追加
         self._add_edited_sprite_name(self.command_input)
         self.message = f"Set group name '{self.command_input}' to sprite ({x}, {y})"
 
-    # タグ設定の処理
-    def _process_tag_command(self, x, y):
-        """DIC/EXT タグコマンドの処理"""
+    # フィールド設定の処理
+    def _process_field_command(self, x, y):
+        """ACT_NAME/FRAME_NUM/ANIM_SPD/EXT フィールドコマンドの処理"""
         sprite_key = self._find_sprite_at_position(x, y)
         
         if sprite_key:
-            # タグインデックスを計算 (DIC_1-3 → 0-2, EXT_1-5 → 3-7)
-            if self.command_mode.startswith('DIC_'):
-                tag_index = int(self.command_mode.split('_')[1]) - 1
-            elif self.command_mode.startswith('EXT_'):
-                tag_index = int(self.command_mode.split('_')[1]) + 2  # EXT_1 → index 3
-            
             if self.command_input:
-                # タグリストに十分なスロットがあることを確認
-                while len(self.sprites[sprite_key]['tags']) <= tag_index:
-                    self.sprites[sprite_key]['tags'].append('UNDEF')
+                # 新フォーマット: 直接フィールドに設定
+                field_key = self.command_mode  # 'ACT_NAME', 'FRAME_NUM', 'ANIM_SPD', 'EXT1'-'EXT5'
                 
-                # UNDEFが唯一のタグの場合は削除
-                if self.sprites[sprite_key]['tags'] == ['UNDEF']:
-                    self.sprites[sprite_key]['tags'] = []
-                
-                # タグを設定
-                if tag_index < len(self.sprites[sprite_key]['tags']):
-                    self.sprites[sprite_key]['tags'][tag_index] = self.command_input
+                if field_key in self.SPRITE_FIELDS.values():
+                    self.sprites[sprite_key][field_key] = self.command_input
+                    
+                    # 編集済みスプライト名リストに追加（現在のスプライト名を取得）
+                    sprite_name = self.sprites[sprite_key].get('NAME', 'NONAME')
+                    self._add_edited_sprite_name(sprite_name)
+                    self.message = f"Set {self.command_mode} to '{self.command_input}'"
                 else:
-                    self.sprites[sprite_key]['tags'].append(self.command_input)
-                
-                # 編集済みスプライト名リストに追加（現在のスプライト名を取得）
-                sprite_name = self.sprites[sprite_key].get('name', 'NONAME')
-                self._add_edited_sprite_name(sprite_name)
-                self.message = f"Set {self.command_mode} to '{self.command_input}'"
+                    self.message = f"Unknown field: {self.command_mode}"
             else:
-                self.message = "Cannot set empty tag"
+                self.message = "Cannot set empty field"
         else:
             # この位置にスプライトがない場合は新規作成
             sprite_key = f"{x}_{y}"
             self.sprites[sprite_key] = {
                 'x': x,
                 'y': y,
-                'name': 'NONAME',
-                'tags': ['UNDEF']
+                'NAME': 'NONAME',
+                'ACT_NAME': 'UNDEF'  # 新フォーマット: デフォルト値
             }
             self.message = "Created new sprite - Set NAME first"
 
-    # コマンド入力完了時の処理（スプライト名やタグの設定など）
+    # コマンド入力完了時の処理（スプライト名やフィールドの設定）
     def _process_command(self):
         """完了したコマンドの処理"""
         # EDITモードではロックされたスプライト位置を使用
@@ -491,8 +505,8 @@ class SpriteDefiner:
         
         if self.command_mode == 'NAME':
             self._process_name_command(x, y)
-        elif self.command_mode in ['DIC_1', 'DIC_2', 'DIC_3', 'EXT_1', 'EXT_2', 'EXT_3', 'EXT_4', 'EXT_5']:
-            self._process_tag_command(x, y)
+        elif self.command_mode in ['ACT_NAME', 'FRAME_NUM', 'ANIM_SPD', 'EXT1', 'EXT2', 'EXT3', 'EXT4', 'EXT5']:
+            self._process_field_command(x, y)
         
         # コマンドモードをリセット
         self.command_mode = None
@@ -521,18 +535,24 @@ class SpriteDefiner:
                 "sprite_size": self.SPRITE_SIZE,
                 "resource_file": self.RESOURCE_FILE,
                 "created_by": "SpriteDefiner",
-                "version": "2.0"
+                "version": "3.0"
             },
             "sprites": {}
         }
         
         for key, data in self.sprites.items():
-            sprite_data["sprites"][key] = {
+            sprite_entry = {
                 "x": data['x'], 
                 "y": data['y'],
-                "name": data.get('name', 'NONAME'),
-                "tags": data['tags']
+                "NAME": data.get('NAME', 'NONAME')
             }
+            
+            # キーワードフィールドを追加
+            for field_key in self.SPRITE_FIELDS.values():
+                if field_key != 'name' and field_key in data:
+                    sprite_entry[field_key] = data[field_key]
+            
+            sprite_data["sprites"][key] = sprite_entry
         
         try:
             with open("sprites.json", "w", encoding="utf-8") as f:
@@ -556,15 +576,21 @@ class SpriteDefiner:
             # 既存のスプライト情報をクリア
             self.sprites = {}
             
-            # JSONからスプライト情報を読み込む
+            # JSONからスプライト情報を読み込む（新フォーマット対応）
             if "sprites" in sprite_data:
                 for key, data in sprite_data["sprites"].items():
-                    self.sprites[key] = {
+                    sprite_entry = {
                         'x': data['x'],
                         'y': data['y'], 
-                        'name': data.get('name', 'NONAME'),
-                        'tags': data.get('tags', ['UNDEF'])
+                        'NAME': data.get('NAME', 'NONAME')
                     }
+                    
+                    # キーワードフィールドをコピー
+                    for field_key in self.SPRITE_FIELDS.values():
+                        if field_key != 'NAME' and field_key in data:
+                            sprite_entry[field_key] = data[field_key]
+                    
+                    self.sprites[key] = sprite_entry
                     
             self.message = f"F11: Loaded {len(self.sprites)} sprites from sprites.json"
         except FileNotFoundError:
@@ -734,21 +760,21 @@ class SpriteDefiner:
         
         sprite_number = self._get_sprite_number(x, y)
         
-        # カーソル位置でスプライトデータを検索
+        # カーソル位置でスプライトデータを検索（新フォーマット対応）
         sprite_name = "NONAME"
-        sprite_tags = ["UNDEF"]
+        sprite_data = {}
         
         for key, data in self.sprites.items():
             if data['x'] == x and data['y'] == y:
-                sprite_name = data.get('name', 'NONAME')
-                sprite_tags = data['tags']
+                sprite_name = data.get('NAME', 'NONAME')
+                sprite_data = data
                 break
         
-        return x, y, sprite_number, sprite_name, sprite_tags
+        return x, y, sprite_number, sprite_name, sprite_data
 
     def _draw_dynamic_info(self, x_pos):
         """カーソル位置に基づく動的スプライト情報を描画"""
-        x, y, sprite_number, sprite_name, sprite_tags = self._get_current_sprite_info()
+        x, y, sprite_number, sprite_name, sprite_data = self._get_current_sprite_info()
         
         # ヘッダー - 常時表示
         pyxel.text(x_pos, self.sprite_display_y, "Sprite Details", pyxel.COLOR_CYAN)
@@ -756,21 +782,21 @@ class SpriteDefiner:
         pyxel.text(x_pos, self.sprite_display_y + 22, f"Number: #{sprite_number}", pyxel.COLOR_WHITE)
         pyxel.text(x_pos, self.sprite_display_y + 32, f"N]Name: {sprite_name}", pyxel.COLOR_YELLOW)
         
-        # DIC情報
-        act_name = sprite_tags[0] if len(sprite_tags) > 0 and sprite_tags[0] != 'UNDEF' else "NO_ACT"
-        frame_num = sprite_tags[1] if len(sprite_tags) > 1 else "NO_FRAME"
-        anim_speed = sprite_tags[2] if len(sprite_tags) > 2 else "NO_SPEED"
+        # フィールド情報（新フォーマット）
+        act_name = sprite_data.get('ACT_NAME', 'NO_ACT')
+        frame_num = sprite_data.get('FRAME_NUM', 'NO_FRAME')
+        anim_speed = sprite_data.get('ANIM_SPD', 'NO_SPEED')
         
         pyxel.text(x_pos, self.sprite_display_y + 42, f"1]ACT_NAME: {act_name}", pyxel.COLOR_GREEN)
         pyxel.text(x_pos, self.sprite_display_y + 52, f"2]FRAME_NUM: {frame_num}", pyxel.COLOR_GREEN)
-        pyxel.text(x_pos, self.sprite_display_y + 62, f"3]ANIM_SPEED: {anim_speed}", pyxel.COLOR_GREEN)
+        pyxel.text(x_pos, self.sprite_display_y + 62, f"3]ANIM_SPD: {anim_speed}", pyxel.COLOR_GREEN)
         
         # EXT情報
-        ext1 = sprite_tags[3] if len(sprite_tags) > 3 else "NO_EXT"
-        ext2 = sprite_tags[4] if len(sprite_tags) > 4 else "NO_EXT"
-        ext3 = sprite_tags[5] if len(sprite_tags) > 5 else "NO_EXT"
-        ext4 = sprite_tags[6] if len(sprite_tags) > 6 else "NO_EXT"
-        ext5 = sprite_tags[7] if len(sprite_tags) > 7 else "NO_EXT"
+        ext1 = sprite_data.get('EXT1', 'NO_EXT')
+        ext2 = sprite_data.get('EXT2', 'NO_EXT')
+        ext3 = sprite_data.get('EXT3', 'NO_EXT')
+        ext4 = sprite_data.get('EXT4', 'NO_EXT')
+        ext5 = sprite_data.get('EXT5', 'NO_EXT')
         
         pyxel.text(x_pos, self.sprite_display_y + 72, f"4]EXT1: {ext1}", pyxel.COLOR_GRAY)
         pyxel.text(x_pos, self.sprite_display_y + 82, f"5]EXT2: {ext2}", pyxel.COLOR_GRAY)
@@ -785,24 +811,27 @@ class SpriteDefiner:
         
         # モードに基づくコンテンツ
         if self.app_state == AppState.EDIT:
-            self._draw_edit_content(x_pos, sprite_tags)
+            self._draw_edit_content(x_pos, sprite_data)
         else:
             self._draw_view_content(x_pos)
     
-    def _draw_edit_content(self, x_pos, sprite_tags):
+    def _draw_edit_content(self, x_pos, sprite_data):
         """編集モードのコンテンツを描画"""
         start_y = self.sprite_display_y + 138  # DIC+EXT表示に対応するため下に移動
         
-        pyxel.text(x_pos, start_y, "Current Tags:", pyxel.COLOR_WHITE)
+        pyxel.text(x_pos, start_y, "Current Fields:", pyxel.COLOR_WHITE)
         
-        tag_y = 12
-        if sprite_tags and sprite_tags != ['UNDEF']:
-            for i, tag in enumerate(sprite_tags[:3]):  # 最大3つのタグを表示
-                tag_name = f"DIC_{i+1}: {tag}"
-                pyxel.text(x_pos, start_y + tag_y, tag_name, pyxel.COLOR_GREEN)
-                tag_y += 10
-        else:
-            pyxel.text(x_pos, start_y + tag_y, "No tags defined", pyxel.COLOR_GRAY)
+        field_y = 12
+        field_count = 0
+        for field_key in ['ACT_NAME', 'FRAME_NUM', 'ANIM_SPD']:
+            if field_key in sprite_data:
+                field_name = f"{field_key}: {sprite_data[field_key]}"
+                pyxel.text(x_pos, start_y + field_y, field_name, pyxel.COLOR_GREEN)
+                field_y += 10
+                field_count += 1
+        
+        if field_count == 0:
+            pyxel.text(x_pos, start_y + field_y, "No fields defined", pyxel.COLOR_GRAY)
     
     def _draw_view_content(self, x_pos):
         """ビューモードのコンテンツを描画 - シンプルなステータス"""

@@ -1,7 +1,8 @@
 import pyxel
 import Common
 import Config
-from SpriteManager import SprList
+import GameState
+from SpriteManager import SprList, sprite_manager, get_bullet_animation_frame
 
 class Bullet:
     def __init__(self, x, y, w, h):
@@ -16,15 +17,19 @@ class Bullet:
         self.col_x, self.col_y, self.col_w, self.col_h = Config.BULLET_COLLISION_BOX
 
     def update(self):
-        self.y -= self.speed
+        self.y -= self.speed  #テスト 1/110の速度で
         
         # Screen boundary check
         if self.y < -self.h:
             self.active = False
 
     def draw(self):
+        # JSON駆動のアニメーション付き弾丸スプライト取得
+        anim_frame = get_bullet_animation_frame(GameState.GameTimer)  # JSONから持続時間取得
+        bullet_sprite = sprite_manager.get_bullet_sprite(anim_frame)
+        
         pyxel.blt(self.x, self.y, Config.TILE_BANK0, 
-                  SprList["BULLET01"].x, SprList["BULLET01"].y, 
+                  bullet_sprite.x, bullet_sprite.y, 
                   self.w, self.h, pyxel.COLOR_BLACK)
         
         # Collision Box

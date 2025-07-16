@@ -20,8 +20,8 @@
             "name": "Python デバッガー: 現在のファイル",
             "type": "debugpy",
             "request": "launch",
-//            "program": "${workspaceFolder}/main.py",
-            "program": "${workspaceFolder}/SpriteDefiner.py",
+            "program": "${workspaceFolder}/main.py",
+//            "program": "${workspaceFolder}/SpriteDefiner.py",
             "console": "integratedTerminal",
             "python": "${workspaceFolder}/../venv/bin/python",            
         }

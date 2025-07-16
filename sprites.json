@@ -3,309 +3,243 @@
     "sprite_size": 8,
     "resource_file": "./my_resource.pyxres",
     "created_by": "SpriteDefiner",
-    "version": "2.0"
+    "version": "3.0"
   },
   "sprites": {
     "8_0": {
       "x": 8,
       "y": 0,
-      "name": "PLAYER",
-      "tags": [
-        "TOP"
-      ]
+      "NAME": "PLAYER",
+      "ACT_NAME": "TOP"
     },
     "16_0": {
       "x": 16,
       "y": 0,
-      "name": "PLAYER",
-      "tags": [
-        "LEFT"
-      ]
+      "NAME": "PLAYER",
+      "ACT_NAME": "LEFT"
     },
     "24_0": {
       "x": 24,
       "y": 0,
-      "name": "PLAYER",
-      "tags": [
-        "RIGHT"
-      ]
+      "NAME": "PLAYER",
+      "ACT_NAME": "RIGHT"
     },
     "40_0": {
       "x": 40,
       "y": 0,
-      "name": "PBULLET",
-      "tags": [
-        "0",
-        "0",
-        "3"
-      ]
+      "NAME": "PBULLET",
+      "ACT_NAME": "NO_ACT",
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "20"
     },
     "48_0": {
       "x": 48,
       "y": 0,
-      "name": "PBULLET",
-      "tags": [
-        "1",
-        "1",
-        "3"
-      ]
+      "NAME": "PBULLET",
+      "ACT_NAME": "NO_ACT",
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "25"
     },
     "56_0": {
       "x": 56,
       "y": 0,
-      "name": "EXHST",
-      "tags": [
-        "UNDEF",
-        "0",
-        "2"
-      ]
+      "NAME": "EXHST",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "10"
     },
     "64_0": {
       "x": 64,
       "y": 0,
-      "name": "EXHST",
-      "tags": [
-        "UNDEF",
-        "1",
-        "2"
-      ]
+      "NAME": "EXHST",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "10"
     },
     "72_0": {
       "x": 72,
       "y": 0,
-      "name": "EXHST",
-      "tags": [
-        "UNDEF",
-        "2",
-        "2"
-      ]
+      "NAME": "EXHST",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "10"
     },
     "80_0": {
       "x": 80,
       "y": 0,
-      "name": "EXHST",
-      "tags": [
-        "UNDEF",
-        "3",
-        "1"
-      ]
+      "NAME": "EXHST",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "10"
     },
     "88_0": {
       "x": 88,
       "y": 0,
-      "name": "MZLFLSH",
-      "tags": [
-        "UNDEF",
-        "0",
-        "1"
-      ]
+      "NAME": "MZLFLSH",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "1"
     },
     "96_0": {
       "x": 96,
       "y": 0,
-      "name": "MZLFLSH",
-      "tags": [
-        "UNDEF",
-        "1",
-        "1"
-      ]
+      "NAME": "MZLFLSH",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "1"
     },
     "104_0": {
       "x": 104,
       "y": 0,
-      "name": "NONAME",
-      "tags": [
-        "UNDEF",
-        "2",
-        "1"
-      ]
+      "NAME": "NONAME",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "1"
     },
     "120_0": {
       "x": 120,
       "y": 0,
-      "name": "ENMYBLT",
-      "tags": [
-        "UNDEF"
-      ]
+      "NAME": "ENMYBLT",
+      "ACT_NAME": "UNDEF"
     },
     "8_8": {
       "x": 8,
       "y": 8,
-      "name": "ENEMY01",
-      "tags": [
-        "UNDEF",
-        "0"
-      ]
+      "NAME": "ENEMY01",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0"
     },
     "16_8": {
       "x": 16,
       "y": 8,
-      "name": "ENEMY01",
-      "tags": [
-        "UNDEF",
-        "1"
-      ]
+      "NAME": "ENEMY01",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1"
     },
     "24_8": {
       "x": 24,
       "y": 8,
-      "name": "ENEMY01",
-      "tags": [
-        "UNDEF",
-        "2"
-      ]
+      "NAME": "ENEMY01",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2"
     },
     "32_8": {
       "x": 32,
       "y": 8,
-      "name": "ENEMY01",
-      "tags": [
-        "UNDEF",
-        "3"
-      ]
+      "NAME": "ENEMY01",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3"
     },
     "40_8": {
       "x": 40,
       "y": 8,
-      "name": "ENEMY02",
-      "tags": [
-        "UNDEF",
-        "0"
-      ]
+      "NAME": "ENEMY02",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0"
     },
     "48_8": {
       "x": 48,
       "y": 8,
-      "name": "ENEMY02",
-      "tags": [
-        "UNDEF",
-        "1"
-      ]
+      "NAME": "ENEMY02",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1"
     },
     "56_8": {
       "x": 56,
       "y": 8,
-      "name": "ENEMY02",
-      "tags": [
-        "UNDEF",
-        "2"
-      ]
+      "NAME": "ENEMY02",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2"
     },
     "64_8": {
       "x": 64,
       "y": 8,
-      "name": "ENEMY02",
-      "tags": [
-        "UNDEF"
-      ]
+      "NAME": "ENEMY02",
+      "ACT_NAME": "UNDEF"
     },
     "72_8": {
       "x": 72,
       "y": 8,
-      "name": "ENEMY03",
-      "tags": [
-        "UNDEF",
-        "0"
-      ]
+      "NAME": "ENEMY03",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0"
     },
     "80_8": {
       "x": 80,
       "y": 8,
-      "name": "ENEMY03",
-      "tags": [
-        "UNDEF",
-        "1"
-      ]
+      "NAME": "ENEMY03",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1"
     },
     "88_8": {
       "x": 88,
       "y": 8,
-      "name": "ENEMY03",
-      "tags": [
-        "UNDEF",
-        "2"
-      ]
+      "NAME": "ENEMY03",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2"
     },
     "96_8": {
       "x": 96,
       "y": 8,
-      "name": "ENEMY03",
-      "tags": [
-        "UNDEF",
-        "3"
-      ]
+      "NAME": "ENEMY03",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3"
     },
     "104_8": {
       "x": 104,
       "y": 8,
-      "name": "ENEMY04",
-      "tags": [
-        "UNDEF",
-        "0"
-      ]
+      "NAME": "ENEMY04",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0"
     },
     "112_8": {
       "x": 112,
       "y": 8,
-      "name": "ENEMY04",
-      "tags": [
-        "NO_ACT",
-        "1"
-      ]
+      "NAME": "ENEMY04",
+      "ACT_NAME": "NO_ACT",
+      "FRAME_NUM": "1"
     },
     "120_8": {
       "x": 120,
       "y": 8,
-      "name": "ENEMY04",
-      "tags": [
-        "UNDEF",
-        "2"
-      ]
+      "NAME": "ENEMY04",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2"
     },
     "128_8": {
       "x": 128,
       "y": 8,
-      "name": "ENEMY04",
-      "tags": [
-        "UNDEF",
-        "3"
-      ]
+      "NAME": "ENEMY04",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3"
     },
     "136_8": {
       "x": 136,
       "y": 8,
-      "name": "ENEMY05",
-      "tags": [
-        "UNDEF",
-        "0"
-      ]
+      "NAME": "ENEMY05",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "0"
     },
     "144_8": {
       "x": 144,
       "y": 8,
-      "name": "ENEMY05",
-      "tags": [
-        "UNDEF",
-        "1"
-      ]
+      "NAME": "ENEMY05",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "1"
     },
     "152_8": {
       "x": 152,
       "y": 8,
-      "name": "ENEMY05",
-      "tags": [
-        "UNDEF",
-        "2"
-      ]
+      "NAME": "ENEMY05",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "2"
     },
     "160_8": {
       "x": 160,
       "y": 8,
-      "name": "ENEMY05",
-      "tags": [
-        "UNDEF",
-        "3"
-      ]
+      "NAME": "ENEMY05",
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3"
     }
   }
 }

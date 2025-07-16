@@ -29,7 +29,7 @@ class SpriteDefiner:
     def __init__(self):
         # ウィンドウ設定
         self.WIDTH = 320
-        self.HEIGHT = 240  # ステータスエリア用に高さを増加
+        self.HEIGHT = 300  # ステータスエリア用に高さを増加
         
         # リソース設定
         self.RESOURCE_FILE = "./my_resource.pyxres"
@@ -74,7 +74,7 @@ class SpriteDefiner:
         self.selected_sprite = self.cursor_sprite  # 初期位置を自動選択
         
         # Pyxelを初期化
-        pyxel.init(self.WIDTH, self.HEIGHT, title="SpriteDefiner", quit_key=pyxel.KEY_NONE)
+        pyxel.init(self.WIDTH, self.HEIGHT, title="SpriteDefiner", quit_key=pyxel.KEY_NONE, display_scale=3)
         pyxel.load(self.RESOURCE_FILE)
         
         # 既存のsprites.jsonがあれば自動読み込み

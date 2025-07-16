@@ -28,8 +28,8 @@ class AppState(Enum):
 class SpriteDefiner:
     def __init__(self):
         # ウィンドウ設定
-        self.WIDTH = 320
-        self.HEIGHT = 300  # ステータスエリア用に高さを増加
+        self.WIDTH = 620  # 256 (sprite area) + 12*2 (margins) + 320 (right panel) = 620
+        self.HEIGHT = 400  # ステータスエリア用に高さを増加
         
         # リソース設定
         self.RESOURCE_FILE = "./my_resource.pyxres"
@@ -42,8 +42,8 @@ class SpriteDefiner:
         self.CURSOR_COLOR_VIEW = pyxel.COLOR_GREEN
         self.CURSOR_COLOR_EDIT = pyxel.COLOR_RED
         self.HOVER_COLOR = pyxel.COLOR_CYAN
-        self.SPRITE_AREA_WIDTH = 128
-        self.SPRITE_AREA_HEIGHT = 128
+        self.SPRITE_AREA_WIDTH = 256  # Full 256x256 sprite sheet
+        self.SPRITE_AREA_HEIGHT = 256
         
         # 状態管理
         self.sprites = {}  # {name: {'x': x, 'y': y, 'tags': []}}
@@ -74,7 +74,7 @@ class SpriteDefiner:
         self.selected_sprite = self.cursor_sprite  # 初期位置を自動選択
         
         # Pyxelを初期化
-        pyxel.init(self.WIDTH, self.HEIGHT, title="SpriteDefiner", quit_key=pyxel.KEY_NONE, display_scale=3)
+        pyxel.init(self.WIDTH, self.HEIGHT, title="SpriteDefiner", quit_key=pyxel.KEY_NONE, display_scale=2)
         pyxel.load(self.RESOURCE_FILE)
         
         # 既存のsprites.jsonがあれば自動読み込み
@@ -605,7 +605,7 @@ class SpriteDefiner:
         self._draw_dynamic_info(sprite_list_x)
         
         # 最近編集されたスプライト名描画（右端に常時表示）
-        recent_names_x = sprite_list_x + 100  # 右端に配置（20px左に移動）
+        recent_names_x = sprite_list_x + 120  # 右端に配置（wider sprite area requires more space）
         self._draw_recent_sprite_names(recent_names_x)
         
         # コントロール（下部）

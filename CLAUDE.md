@@ -433,3 +433,186 @@ JSON形式の設定ファイルを基盤とした、ビジュアルなスプラ�
 - **継続的な改善**: 使いやすさの追求
 
 SpriteDefinerの開発により、PyxelShmupプロジェクトのスプライト管理が大幅に改善され、次の段階であるゲーム本体統合への準備が整った。
+
+---
+
+# SpriteDefinerリファクタリング・UI改善記録
+
+## 概要
+2025年7月15日、SpriteDefiner.pyの大規模リファクタリングと多言語対応の改善を実施した。
+
+## 実施内容
+
+### Phase 1: コードリファクタリング
+- **問題点の特定**: 743行の巨大な単一クラスによる保守性の低下
+- **単一責任の原則適用**: 各メソッドが単一の責任を持つよう分割
+- **状態管理の改善**: AppStateのEnumを使用したクリーンな状態管理
+- **共通処理の抽出**: テキスト入力処理の共通化
+
+### Phase 2: 機能改善
+- **バグ修正**: EDITモードでのDIC変更時の状態遷移問題を解決
+- **視覚的一貫性**: EDIT/COMMAND_INPUTモードでの一貫したグリッド色表示
+- **起動時自動読み込み**: sprites.jsonの自動読み込み機能追加
+- **エラーハンドリング**: ファイル読み込み時の適切なエラー処理
+
+### Phase 3: 多言語対応の適正化
+- **問題認識**: Pyxelの日本語フォント非対応による表示問題
+- **UI表示の英語化**: 全てのユーザー向けメッセージを英語に変更
+- **内部コメントの日本語保持**: 開発者向けコメントは日本語で維持
+- **バイリンガルコメント構造**: 将来の多言語対応に向けた構造化
+
+## 🔧 技術的改善詳細
+
+### リファクタリング成果
+```python
+# Before: 巨大な単一メソッド
+def update(self):
+    # 200行以上の複雑な処理...
+
+# After: 責任分離されたメソッド群
+def update(self):
+    if self.app_state == AppState.SAVE_CONFIRM:
+        self._handle_save_confirmation()
+    elif self.app_state == AppState.QUIT_CONFIRM:
+        self._handle_quit_confirmation()
+    # ...
+
+def _handle_cursor_movement(self):
+    # カーソル移動専用処理
+
+def _handle_selection_input(self):
+    # 選択処理専用
+```
+
+### 状態管理の改善
+```python
+# Before: 複数のbooleanフラグ
+self.edit_mode = False
+self.input_mode = False
+self.save_confirm_mode = False
+self.quit_confirm_mode = False
+
+# After: Enumによる明確な状態管理
+class AppState(Enum):
+    VIEW = "view"
+    EDIT = "edit"
+    COMMAND_INPUT = "command_input"
+    LEGACY_INPUT = "legacy_input"
+    SAVE_CONFIRM = "save_confirm"
+    QUIT_CONFIRM = "quit_confirm"
+```
+
+### 共通処理の抽出
+```python
+# Before: 重複したテキスト入力コード
+def _handle_command_input(self):
+    # 文字入力処理のコード重複...
+
+def _handle_text_input(self):
+    # 同じ文字入力処理の重複...
+
+# After: 共通処理メソッド
+def _handle_text_input_common(self, input_text):
+    # 統一された文字入力処理
+    return input_text
+
+def _handle_command_input(self):
+    self.command_input = self._handle_text_input_common(self.command_input)
+
+def _handle_text_input(self):
+    self.input_text = self._handle_text_input_common(self.input_text)
+```
+
+## 🌐 多言語対応の適正化
+
+### 発見した問題
+- Pyxelエンジンは日本語フォントをサポートしていない
+- 日本語メッセージが正しく表示されない
+- ユーザー体験の大幅な低下
+
+### 解決策の実装
+```python
+# Before: 日本語UI表示
+self.message = "スプライト名を入力 (レガシーモード):"
+
+# After: 英語UI表示
+self.message = "Enter sprite name (legacy mode):"
+
+# 内部コメントは日本語で保持
+def _handle_legacy_input_trigger(self):
+    """レガシー命名モードのトリガー処理（意図的使用のためShift+Enter）"""
+```
+
+### バイリンガルコメント構造
+```python
+#ソースコードの中のコメントは日本語、英語を併記してください
+##例
+# :jp この関数はスプライトを表示します
+# :en This function displays the sprite
+# #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
+```
+
+## 📊 改善結果
+
+### コード品質向上
+- **保守性**: 各メソッドが単一責任を持つ
+- **可読性**: 状態管理が明確
+- **拡張性**: 新機能追加が容易
+- **テスト容易性**: 個別メソッドのテスト可能
+
+### ユーザー体験向上
+- **表示問題解決**: 全てのメッセージが正しく表示
+- **操作の安定性**: 状態遷移のバグ修正
+- **視覚的一貫性**: UI表示の改善
+- **起動時利便性**: 自動読み込み機能
+
+### 開発体験向上
+- **デバッグ容易性**: 問題箇所の特定が簡単
+- **コード理解**: 構造が明確
+- **機能追加**: 影響範囲が限定的
+- **多言語対応**: 将来の拡張に対応
+
+## 💡 得られた知見
+
+### リファクタリングの重要性
+1. **段階的アプローチ**: 一度に全てを変更せず、段階的に実施
+2. **動作確認**: 各段階での動作テストが重要
+3. **ユーザーフィードバック**: 実際の使用感からの改善点発見
+
+### 多言語対応の注意点
+1. **技術的制約の理解**: フレームワークの制限を事前に把握
+2. **表示テスト**: 実際の表示確認が必須
+3. **段階的導入**: 内部コメントから始めて段階的に対応
+
+### 開発ツール設計の原則
+1. **使いやすさ優先**: 開発者の作業効率を最優先
+2. **エラー防止**: 誤操作を防ぐ仕組みの重要性
+3. **視覚的フィードバック**: 状態の明確な表示
+
+## 🚀 今後の展望
+
+### 短期的改善
+- SpriteDefinerとゲーム本体の統合
+- JSON形式スプライトデータの活用
+- 動的スプライト管理機能の実装
+
+### 中期的発展
+- より高度なスプライト編集機能
+- アニメーション設定の視覚化
+- チーム開発支援機能
+
+### 長期的ビジョン
+- 完全なビジュアルゲーム開発環境
+- 多言語開発支援
+- 拡張可能なツールチェーン
+
+## 🎯 まとめ
+
+SpriteDefinerのリファクタリングと多言語対応改善により、以下の成果を達成した：
+
+1. **技術的負債の解消**: 743行の巨大クラスを保守性の高い構造に改善
+2. **ユーザー体験の向上**: 表示問題の解決と操作性の改善
+3. **開発効率の向上**: デバッグとメンテナンスの容易化
+4. **将来への準備**: 多言語対応とツール拡張の基盤構築
+
+この改善により、PyxelShmupプロジェクトの開発ツールチェーンが大幅に強化され、より効率的で持続可能な開発体制が確立された。

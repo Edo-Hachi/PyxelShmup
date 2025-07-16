@@ -3,3 +3,4 @@
 __pycache__/
 ./vscode
 scrshot*.png
+.claude/settings.local.json

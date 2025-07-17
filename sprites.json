@@ -91,7 +91,7 @@
     "104_0": {
       "x": 104,
       "y": 0,
-      "NAME": "NONAME",
+      "NAME": "MZLFLSH",
       "ACT_NAME": "UNDEF",
       "FRAME_NUM": "2",
       "ANIM_SPD": "1"
@@ -107,139 +107,160 @@
       "y": 8,
       "NAME": "ENEMY01",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "0"
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "10"
     },
     "16_8": {
       "x": 16,
       "y": 8,
       "NAME": "ENEMY01",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "1"
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "10"
     },
     "24_8": {
       "x": 24,
       "y": 8,
       "NAME": "ENEMY01",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "2"
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "10"
     },
     "32_8": {
       "x": 32,
       "y": 8,
       "NAME": "ENEMY01",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "3"
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "10"
     },
     "40_8": {
       "x": 40,
       "y": 8,
       "NAME": "ENEMY02",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "0"
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "12"
     },
     "48_8": {
       "x": 48,
       "y": 8,
       "NAME": "ENEMY02",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "1"
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "12"
     },
     "56_8": {
       "x": 56,
       "y": 8,
       "NAME": "ENEMY02",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "2"
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "12"
     },
     "64_8": {
       "x": 64,
       "y": 8,
       "NAME": "ENEMY02",
-      "ACT_NAME": "UNDEF"
+      "ACT_NAME": "UNDEF",
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "12"
     },
     "72_8": {
       "x": 72,
       "y": 8,
       "NAME": "ENEMY03",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "0"
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "8"
     },
     "80_8": {
       "x": 80,
       "y": 8,
       "NAME": "ENEMY03",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "1"
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "8"
     },
     "88_8": {
       "x": 88,
       "y": 8,
       "NAME": "ENEMY03",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "2"
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "8"
     },
     "96_8": {
       "x": 96,
       "y": 8,
       "NAME": "ENEMY03",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "3"
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "8"
     },
     "104_8": {
       "x": 104,
       "y": 8,
       "NAME": "ENEMY04",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "0"
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "15"
     },
     "112_8": {
       "x": 112,
       "y": 8,
       "NAME": "ENEMY04",
       "ACT_NAME": "NO_ACT",
-      "FRAME_NUM": "1"
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "15"
     },
     "120_8": {
       "x": 120,
       "y": 8,
       "NAME": "ENEMY04",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "2"
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "15"
     },
     "128_8": {
       "x": 128,
       "y": 8,
       "NAME": "ENEMY04",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "3"
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "15"
     },
     "136_8": {
       "x": 136,
       "y": 8,
       "NAME": "ENEMY05",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "0"
+      "FRAME_NUM": "0",
+      "ANIM_SPD": "6"
     },
     "144_8": {
       "x": 144,
       "y": 8,
       "NAME": "ENEMY05",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "1"
+      "FRAME_NUM": "1",
+      "ANIM_SPD": "6"
     },
     "152_8": {
       "x": 152,
       "y": 8,
       "NAME": "ENEMY05",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "2"
+      "FRAME_NUM": "2",
+      "ANIM_SPD": "6"
     },
     "160_8": {
       "x": 160,
       "y": 8,
       "NAME": "ENEMY05",
       "ACT_NAME": "UNDEF",
-      "FRAME_NUM": "3"
+      "FRAME_NUM": "3",
+      "ANIM_SPD": "6"
     }
   }
 }

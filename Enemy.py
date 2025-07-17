@@ -2,7 +2,7 @@ import pyxel
 import Common
 import Config
 import GameState
-from SpriteManager import get_enemy_sprite
+from SpriteManager import sprite_manager
 import random
 import math
 from ExplodeManager import ExpType
@@ -43,6 +43,9 @@ class Enemy:
 
         # Enemy sprite id (1-5)
         self.sprite_num = sprite_num
+        
+        # アニメーション設定をJSONから取得
+        self.animation_speed = self._get_animation_speed()
 
         self.active = True
         self.shoot_timer = random.randint(0, Config.ENEMY_SHOOT_INTERVAL)  # 発射タイマー
@@ -352,12 +355,11 @@ class Enemy:
 
         self.flash -= 1
 
-        #anim_pat = 0 ~ 3
-        AnimFrame = 10  #アニメーションの速度を変更できるよ
-        anim_pat = pyxel.frame_count // AnimFrame % 4  # 0～3でぐるぐる（アニメ切り替え）
-
-        # get sprite coordinates from Common by enemy number
-        sprite_idx = get_enemy_sprite(self.sprite_num, anim_pat)
+        # JSON駆動のアニメーション計算
+        anim_pat = self._get_animation_frame(pyxel.frame_count)
+        
+        # JSON駆動のスプライト取得
+        sprite_idx = self._get_enemy_sprite(anim_pat)
 
         pyxel.blt(
             self.x,
@@ -375,3 +377,21 @@ class Enemy:
         # Collision Box
         if Config.DEBUG:
             pyxel.rectb(self.x + self.col_x, self.y + self.col_y, self.col_w, self.col_h, pyxel.COLOR_RED)
+    
+    def _get_animation_speed(self):
+        """JSONからエネミーアニメーション速度を取得する"""
+        enemy_name = f"ENEMY{self.sprite_num:02d}"
+        anim_spd = sprite_manager.get_sprite_metadata(enemy_name, "ANIM_SPD", "10")
+        try:
+            return int(anim_spd)
+        except (ValueError, TypeError):
+            return 10  # デフォルト値
+    
+    def _get_animation_frame(self, frame_count):
+        """フレームカウントに基づいてアニメーションフレームを計算する"""
+        return frame_count // self.animation_speed % 4  # 0～3でぐるぐる
+    
+    def _get_enemy_sprite(self, anim_pat):
+        """エネミーのスプライトを取得する"""
+        enemy_name = f"ENEMY{self.sprite_num:02d}"
+        return sprite_manager.get_sprite_by_name_and_field(enemy_name, "FRAME_NUM", str(anim_pat % 4))

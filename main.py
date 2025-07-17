@@ -8,7 +8,7 @@ import random
 import Common
 import Config
 import GameState
-from SpriteManager import SprList
+# from SpriteManager import SprList  # No longer needed
 from StageManager import get_current_stage_map, check_stage_clear
 from Enemy import Enemy, ENEMY_MOVE_SPEED, MOVE_THRESHOLD
 from ExplodeManager import ExpType

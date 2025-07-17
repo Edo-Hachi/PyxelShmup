@@ -4,7 +4,7 @@ import pyxel
 import Common
 import Config
 import GameState
-from SpriteManager import SprList, sprite_manager
+from SpriteManager import sprite_manager
 import math
 from ExplodeManager import ExpType
 
@@ -136,12 +136,13 @@ class Player:
         pyxel.blt(self.x, self.y+8, Config.TILE_BANK0,
             exhaust_sprite.x, exhaust_sprite.y, self.width, self.height, pyxel.COLOR_BLACK)
 
-        #Muzzle Flash
+        #Muzzle Flash - JSON駆動のスプライト取得
         if self.MuzlFlash >= 0:
+            muzzle_sprite = self._get_muzzle_flash_sprite()
             pyxel.blt(self.x-4, self.y-6, Config.TILE_BANK0,
-                      SprList[MuzlNames[self.MuzlFlash]].x, SprList[MuzlNames[self.MuzlFlash]].y, 8, 8, pyxel.COLOR_BLACK)
+                      muzzle_sprite.x, muzzle_sprite.y, 8, 8, pyxel.COLOR_BLACK)
             pyxel.blt(self.x+4, self.y-6, Config.TILE_BANK0,
-                      SprList[MuzlNames[self.MuzlFlash]].x, SprList[MuzlNames[self.MuzlFlash]].y, 8, 8, pyxel.COLOR_BLACK)
+                      muzzle_sprite.x, muzzle_sprite.y, 8, 8, pyxel.COLOR_BLACK)
 
         self.MuzlFlash -= 1
         
@@ -182,3 +183,7 @@ class Player:
             return int(anim_spd)
         except (ValueError, TypeError):
             return 1
+    
+    def _get_muzzle_flash_sprite(self):
+        """マズルフラッシュのスプライトを取得する"""
+        return sprite_manager.get_sprite_by_name_and_field("MZLFLSH", "FRAME_NUM", str(self.MuzlFlash))

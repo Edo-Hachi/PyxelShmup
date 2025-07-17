@@ -2,7 +2,7 @@ import pyxel
 import Common
 import Config
 import GameState
-from SpriteManager import SprList, sprite_manager
+from SpriteManager import sprite_manager
 
 class Bullet:
     def __init__(self, x, y, w, h):

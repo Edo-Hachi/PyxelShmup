@@ -41,9 +41,10 @@ class Player:
 
         self.SprName = "TOP"    #Drawing Sprite Name
 
+        # エグゾーストアニメーション管理
         self.ExtIndex = 0
-        self.ExtSpr = "EXT01"  # Exhaust Sprite Name
-        self.ExtTimer = 0  # Exhaust Animation Timer
+        self.ExtTimer = 0
+        self.exhaust_duration = self._get_exhaust_animation_duration()
 
         self.MuzlFlash = -1  # Muzzle Flash List
 
@@ -55,13 +56,9 @@ class Player:
             return  
         
         #Exhaust Animation -------- JSON駆動の持続時間制御
-        self.ExtSpr = ExtNames[self.ExtIndex]
-        
-        # JSON設定に基づくタイマー制御
-        exhaust_duration = sprite_manager.get_exhaust_animation_duration()
         self.ExtTimer += 1
         
-        if self.ExtTimer >= exhaust_duration:
+        if self.ExtTimer >= self.exhaust_duration:
             self.ExtTimer = 0
             self.ExtIndex += 1
             if self.ExtIndex >= ExtMax:
@@ -127,7 +124,7 @@ class Player:
             pyxel.pal()  # クールタイム終了時はパレットをリセット
 
         #Player Ship - JSON駆動のスプライト取得
-        player_sprite = sprite_manager.get_player_sprite(self.SprName)
+        player_sprite = self._get_player_sprite()
         pyxel.blt(self.x, self.y, Config.TILE_BANK0,
                 player_sprite.x, player_sprite.y, self.width, self.height, pyxel.COLOR_BLACK)
 
@@ -135,7 +132,7 @@ class Player:
         pyxel.pal()
         
         #Exhaust - JSON駆動のエグゾーストスプライト取得
-        exhaust_sprite = sprite_manager.get_exhaust_sprite(self.ExtIndex)
+        exhaust_sprite = self._get_exhaust_sprite()
         pyxel.blt(self.x, self.y+8, Config.TILE_BANK0,
             exhaust_sprite.x, exhaust_sprite.y, self.width, self.height, pyxel.COLOR_BLACK)
 
@@ -169,3 +166,19 @@ class Player:
             # 画面効果
             GameState.ShakeTimer = Config.SHAKE_TIME
             GameState.StopTimer = Config.STOP_TIME
+    
+    def _get_player_sprite(self):
+        """プレイヤーの現在のスプライトを取得する"""
+        return sprite_manager.get_sprite_by_name_and_field("PLAYER", "ACT_NAME", self.SprName)
+    
+    def _get_exhaust_sprite(self):
+        """エグゾーストの現在のスプライトを取得する"""
+        return sprite_manager.get_sprite_by_name_and_field("EXHST", "FRAME_NUM", str(self.ExtIndex))
+    
+    def _get_exhaust_animation_duration(self):
+        """エグゾーストアニメーションの持続時間を取得する"""
+        anim_spd = sprite_manager.get_sprite_metadata("EXHST", "ANIM_SPD", "1")
+        try:
+            return int(anim_spd)
+        except (ValueError, TypeError):
+            return 1

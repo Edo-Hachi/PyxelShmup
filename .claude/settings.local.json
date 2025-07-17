@@ -29,5 +29,5 @@
       "Bash(mongod:*)",
       "mcp__supabase__execute_sql"
     ]
-  },
+  }
 }

@@ -109,6 +109,9 @@ class Enemy:
             elif self.entry_pattern == 2:
                 self.x = Config.WIN_WIDTH + 16
                 self.y = Config.WIN_HEIGHT - 20
+            elif self.entry_pattern == 3:
+                self.x = 0
+                self.y = 64
             else: # Default spawn off-screen top
                 self.x = self.formation_x
                 self.y = -16
@@ -145,7 +148,62 @@ class Enemy:
         self.entry_timer += 1
         entry_duration = 120  # 2 seconds for the loop animation
 
-        if self.entry_timer <= entry_duration:
+        if self.entry_pattern == 3: # Zigzag pattern
+            # X座標ベースでのジグザグパターン
+            # 24ピクセル右→36ピクセル上→24ピクセル右→36ピクセル下→24ピクセル右→36ピクセル上→24ピクセル右
+            # X座標が96ピクセルを超えたらホームポジションへ移動
+            
+            if self.x < 96:
+                # 現在のX位置に基づいて移動状態を決定
+                if self.x < 24:
+                    # 0-24ピクセル：右に移動
+                    self.x += 1.0
+                    self.y = 64
+                elif self.x == 24 and self.y > 28:
+                    # X=24で上に移動中（64→28）
+                    self.y -= 1.0
+                elif self.x < 48:
+                    # 24-48ピクセル：右に移動
+                    self.x += 1.0
+                    # Y座標は28で固定
+                elif self.x == 48 and self.y < 64:
+                    # X=48で下に移動中（28→64）
+                    self.y += 1.0
+                elif self.x < 72:
+                    # 48-72ピクセル：右に移動
+                    self.x += 1.0
+                    # Y座標は64で固定
+                elif self.x == 72 and self.y > 28:
+                    # X=72で上に移動中（64→28）
+                    self.y -= 1.0
+                else:
+                    # 72-96ピクセル：右に移動
+                    self.x += 1.0
+                    # Y座標は28で固定
+            else:
+                # X座標が96を超えたらホームポジションに移動
+                target_x = self.formation_x
+                target_y = self.formation_y
+                
+                # Y-axis movement
+                self.y += self.DESCEND_SPEED
+                
+                # X-axis movement
+                x_diff = target_x - self.x
+                if abs(x_diff) > 1:
+                    self.x += math.copysign(min(abs(x_diff), 2), x_diff)
+                else:
+                    self.x = target_x
+                
+                # Check for arrival
+                distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
+                if distance_to_formation <= self.FORMATION_PROXIMITY or self.y > target_y:
+                    self.x = target_x
+                    self.y = target_y
+                    self.base_x = target_x
+                    self.base_y = target_y
+                    self.state = ENEMY_STATE_FORMATION_READY
+        elif self.entry_timer <= entry_duration:
             if self.entry_pattern == 1: # Left loop
                 loop_center_x = Config.WIN_WIDTH / 4
                 loop_center_y = Config.WIN_HEIGHT / 2

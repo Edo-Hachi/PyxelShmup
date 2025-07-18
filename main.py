@@ -112,7 +112,11 @@ def update_playing(self):
             enemy_x = OFSX + (BASEX * _x)
             sprite_num = get_current_stage_map()[_y][_x]
             
-            pattern = 1 if _x < 5 else 2
+            # 新しいジグザグパターンをテスト
+            if _y == 0:  # 1行目だけジグザグパターン
+                pattern = 3
+            else:
+                pattern = 1 if _x < 5 else 2
 
             _Enemy = Enemy(0, 0, 8, 8, 2, 100, sprite_num, formation_pos=(enemy_x, enemy_y), entry_pattern=pattern)
             Common.enemy_list.append(_Enemy)

@@ -1,3 +1,8 @@
+#ソースコードの中のコメントは日本語にしましょう
+# #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
+# CLAUDE.md を書き込むときは英語にしてください
+# 変数の型は宣言してください
+
 # Common Utilities
 # Core game utilities and shared functionality
 

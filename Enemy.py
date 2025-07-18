@@ -12,6 +12,7 @@ import random
 import math
 from ExplodeManager import ExpType
 from EnemyBullet import EnemyBullet
+from EntryPatterns import EntryPatternFactory
 
 # Enemy States
 ENEMY_STATE_ENTERING = -1
@@ -99,22 +100,24 @@ class Enemy:
         # Entry animation properties
         self.entry_pattern = entry_pattern
         self.entry_timer = 0
+        self.entry_handler = None
         if formation_pos and entry_pattern:
             self.state = ENEMY_STATE_ENTERING
             self.formation_x, self.formation_y = formation_pos
-            # Set initial position based on pattern
-            if self.entry_pattern == 1:
-                self.x = -16
-                self.y = Config.WIN_HEIGHT - 20
-            elif self.entry_pattern == 2:
-                self.x = Config.WIN_WIDTH + 16
-                self.y = Config.WIN_HEIGHT - 20
-            elif self.entry_pattern == 3:
-                self.x = 0
-                self.y = 64
-            else: # Default spawn off-screen top
-                self.x = self.formation_x
-                self.y = -16
+            # 隊列判定のためにbase_yを正しく設定
+            self.base_y = self.formation_y
+            
+            # 入場パターンハンドラーを作成
+            self.entry_handler = EntryPatternFactory.create(entry_pattern)
+            
+            # パターンに応じた初期位置を設定
+            initial_x, initial_y = EntryPatternFactory.get_initial_position(entry_pattern)
+            self.x = initial_x
+            self.y = initial_y
+        else:
+            # Default spawn off-screen top
+            self.x = self.formation_x
+            self.y = -16
 
 
     def update(self, move_amount_x=0):
@@ -144,100 +147,28 @@ class Enemy:
         self._update_shooting()
 
     def _update_entering(self, move_amount_x):
-        """入場アニメーション処理"""
-        self.entry_timer += 1
-        entry_duration = 120  # 2 seconds for the loop animation
-
-        if self.entry_pattern == 3: # Zigzag pattern
-            # X座標ベースでのジグザグパターン
-            # 24ピクセル右→36ピクセル上→24ピクセル右→36ピクセル下→24ピクセル右→36ピクセル上→24ピクセル右
-            # X座標が96ピクセルを超えたらホームポジションへ移動
-            
-            if self.x < 96:
-                # 現在のX位置に基づいて移動状態を決定
-                if self.x < 24:
-                    # 0-24ピクセル：右に移動
-                    self.x += 1.0
-                    self.y = 64
-                elif self.x == 24 and self.y > 28:
-                    # X=24で上に移動中（64→28）
-                    self.y -= 1.0
-                elif self.x < 48:
-                    # 24-48ピクセル：右に移動
-                    self.x += 1.0
-                    # Y座標は28で固定
-                elif self.x == 48 and self.y < 64:
-                    # X=48で下に移動中（28→64）
-                    self.y += 1.0
-                elif self.x < 72:
-                    # 48-72ピクセル：右に移動
-                    self.x += 1.0
-                    # Y座標は64で固定
-                elif self.x == 72 and self.y > 28:
-                    # X=72で上に移動中（64→28）
-                    self.y -= 1.0
-                else:
-                    # 72-96ピクセル：右に移動
-                    self.x += 1.0
-                    # Y座標は28で固定
-            else:
-                # X座標が96を超えたらホームポジションに移動
-                target_x = self.formation_x
-                target_y = self.formation_y
-                
-                # Y-axis movement
-                self.y += self.DESCEND_SPEED
-                
-                # X-axis movement
-                x_diff = target_x - self.x
-                if abs(x_diff) > 1:
-                    self.x += math.copysign(min(abs(x_diff), 2), x_diff)
-                else:
-                    self.x = target_x
-                
-                # Check for arrival
-                distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-                if distance_to_formation <= self.FORMATION_PROXIMITY or self.y > target_y:
-                    self.x = target_x
-                    self.y = target_y
-                    self.base_x = target_x
-                    self.base_y = target_y
-                    self.state = ENEMY_STATE_FORMATION_READY
-        elif self.entry_timer <= entry_duration:
-            if self.entry_pattern == 1: # Left loop
-                loop_center_x = Config.WIN_WIDTH / 4
-                loop_center_y = Config.WIN_HEIGHT / 2
-                radius = 40
-                angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
-                progress = self.entry_timer / entry_duration
-                current_radius = progress * radius
-                self.x = loop_center_x + math.cos(angle) * current_radius
-                self.y = loop_center_y + math.sin(angle) * current_radius
-            elif self.entry_pattern == 2: # Right loop
-                loop_center_x = Config.WIN_WIDTH * 3 / 4
-                loop_center_y = Config.WIN_HEIGHT / 2
-                radius = 40
-                angle = (self.entry_timer / entry_duration) * 2 * math.pi - math.pi / 2
-                progress = self.entry_timer / entry_duration
-                current_radius = progress * radius
-                self.x = loop_center_x - math.cos(angle) * current_radius # Mirrored X
-                self.y = loop_center_y + math.sin(angle) * current_radius
+        """入場アニメーション処理（リファクタリング後）"""
+        if self.entry_handler:
+            # パターンハンドラーに処理を委譲
+            if self.entry_handler.update(self):
+                # 入場パターン完了
+                self.state = ENEMY_STATE_FORMATION_READY
         else:
-            # After loop, move to formation position (descending logic)
+            # デフォルトの直線降下パターン
             target_x = self.formation_x
             target_y = self.formation_y
-
-            # Y-axis movement
+            
+            # Y軸方向の移動
             self.y += self.DESCEND_SPEED
-
-            # X-axis movement
+            
+            # X軸方向の移動
             x_diff = target_x - self.x
             if abs(x_diff) > 1:
                 self.x += math.copysign(min(abs(x_diff), 2), x_diff)
             else:
                 self.x = target_x
-
-            # Check for arrival
+            
+            # 到達判定
             distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
             if distance_to_formation <= self.FORMATION_PROXIMITY or self.y > target_y:
                 self.x = target_x

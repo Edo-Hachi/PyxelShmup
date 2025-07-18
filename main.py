@@ -90,42 +90,86 @@ def update_playing(self):
     for _e in Common.enemy_list:
         _e.update(move_amount)
 
-    #ゲームスタート時の敵スポーン処理
+    #ゲームスタート時の敵スポーン処理（ウェーブキューシステム）
     if GameState.GameStateSub == Config.STATE_PLAYING_ENEMY_ENTRY:
         if not hasattr(self, 'spawn_timer'):
             self.spawn_timer = 0
             self.spawn_index = 0
+            # ウェーブキューの初期化
+            self.wave_queue = [
+                {"row": 0, "state": 1, "spawn_index": 0},  # 1行目：出現中
+                {"row": 1, "state": 0, "spawn_index": 0},  # 2行目：待機中
+                {"row": 2, "state": 0, "spawn_index": 0},  # 3行目：待機中
+                {"row": 3, "state": 0, "spawn_index": 0},  # 4行目：待機中
+            ]
             # Clear existing enemies for new stage
             Common.enemy_list.clear()
 
         self.spawn_timer += 1
-        if self.spawn_timer % 6 == 0 and self.spawn_index < 40:
-            _y = self.spawn_index // 10
-            _x = self.spawn_index % 10
-
-            BASEX = 11
-            OFSX = 10
-            BASEY = 11
-            OFSY = 10
-
-            enemy_y = OFSY + (BASEY * _y)
-            enemy_x = OFSX + (BASEX * _x)
-            sprite_num = get_current_stage_map()[_y][_x]
+        
+        # 定数定義
+        BASEX = 11
+        OFSX = 10
+        BASEY = 11
+        OFSY = 10
+        
+        # 各ウェーブの状態管理
+        for wave in self.wave_queue:
+            row = wave["row"]
+            state = wave["state"]
             
-            # 新しいジグザグパターンをテスト
-            if _y == 0:  # 1行目だけジグザグパターン
-                pattern = 3
-            else:
-                pattern = 1 if _x < 5 else 2
+            # 出現中のウェーブの処理
+            if state == 1 and self.spawn_timer % 6 == 0:  # SPAWNING
+                if wave["spawn_index"] < 10:
+                    _y = row
+                    _x = wave["spawn_index"]
 
-            _Enemy = Enemy(0, 0, 8, 8, 2, 100, sprite_num, formation_pos=(enemy_x, enemy_y), entry_pattern=pattern)
-            Common.enemy_list.append(_Enemy)
+                    enemy_y = OFSY + (BASEY * _y)
+                    enemy_x = OFSX + (BASEX * _x)
+                    sprite_num = get_current_stage_map()[_y][_x]
+                    
+                    # パターン設定
+                    if _y == 0:  # 1行目だけジグザグパターン
+                        pattern = 3
+                    else:
+                        pattern = 1 if _x < 5 else 2
+
+                    _Enemy = Enemy(0, 0, 8, 8, 2, 100, sprite_num, formation_pos=(enemy_x, enemy_y), entry_pattern=pattern)
+                    Common.enemy_list.append(_Enemy)
+                    
+                    wave["spawn_index"] += 1
+                    
+                    # 出現完了チェック
+                    if wave["spawn_index"] >= 10:
+                        wave["state"] = 2  # ENTERING状態へ遷移
             
-            self.spawn_index += 1
-
-        # Check if all enemies are spawned and ready
-        if self.spawn_index >= 40:
-            # activeな敵のうち、全員がFORMATION_READYならNORMALへ遷移
+            # 入場中のウェーブの完了チェック
+            elif state == 2:  # ENTERING
+                # 現在の行の全敵がFORMATION_READYになったかチェック
+                current_row_enemies = [e for e in Common.enemy_list if e.active and 
+                                     e.base_y == OFSY + (BASEY * row)]
+                ready_enemies = [e for e in current_row_enemies if e.state == -2]
+                
+                # デバッグ情報
+                if Config.DEBUG and len(current_row_enemies) > 0:
+                    entering_enemies = [e for e in current_row_enemies if e.state == -1]
+                    print(f"Wave {row}: Total={len(current_row_enemies)}, Entering={len(entering_enemies)}, Ready={len(ready_enemies)}")
+                
+                # 入場完了判定
+                if len(ready_enemies) == len(current_row_enemies) and len(current_row_enemies) > 0:
+                    wave["state"] = 3  # COMPLETED状態へ遷移
+                    if Config.DEBUG:
+                        print(f"Wave {row} completed! Triggering next wave.")
+                    
+                    # 次のウェーブを起動
+                    next_wave_index = row + 1
+                    if next_wave_index < len(self.wave_queue):
+                        self.wave_queue[next_wave_index]["state"] = 1  # SPAWNING状態へ
+        
+        # 全ウェーブ完了チェック
+        all_completed = all(wave["state"] == 3 for wave in self.wave_queue)
+        if all_completed:
+            # 全隊列の出現・入場完了、戦闘開始
             active_ready = [e for e in Common.enemy_list if e.active and e.state == -2]
             active_count = len([e for e in Common.enemy_list if e.active])
             if active_count == 0:
@@ -133,6 +177,7 @@ def update_playing(self):
                 GameState.GameStateSub = Config.STATE_PLAYING_STAGE_CLEAR
                 del self.spawn_timer
                 del self.spawn_index
+                del self.wave_queue
             elif active_count > 0 and len(active_ready) == active_count:
                 # activeな敵だけNORMALへ遷移
                 for enemy in Common.enemy_list:
@@ -141,6 +186,7 @@ def update_playing(self):
                         enemy.attack_cooldown_timer = random.randint(0, 300)
                 del self.spawn_timer
                 del self.spawn_index
+                del self.wave_queue
                 GameState.GameStateSub = Config.STATE_PLAYING_FIGHT
 
     # 星の背景アニメーションは常に更新（ヒットストップの影響を受けない）

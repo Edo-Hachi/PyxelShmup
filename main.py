@@ -1,6 +1,13 @@
 #ソースコードの中のコメントは日本語にしましょう
 # #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
 # CLAUDE.md を書き込むときは英語にしてください
+# 変数の型は宣言してください
+
+#todo
+#Enemyの出現パターンを２種類くらいふやす（四角軌跡、３角軌跡、ダブルループ）
+#EnemyにLifeを設定（jsonから）
+#面クリア時の演出
+
 
 import pyxel
 import random
@@ -10,7 +17,7 @@ import Config
 import GameState
 # from SpriteManager import SprList  # No longer needed
 from StageManager import get_current_stage_map, check_stage_clear
-from Enemy import Enemy, ENEMY_MOVE_SPEED, MOVE_THRESHOLD
+from Enemy import Enemy
 from ExplodeManager import ExpType
 
 from StarManager import StarManager
@@ -54,10 +61,10 @@ def update_playing(self):
     # --- 敵の移動処理（戦闘中のみ） ---
     if GameState.GameStateSub == Config.STATE_PLAYING_FIGHT:
         # グループ移動の更新
-        GameState.enemy_group_x += ENEMY_MOVE_SPEED * GameState.enemy_move_direction
+        GameState.enemy_group_x += Enemy.MOVE_SPEED * GameState.enemy_move_direction
         
         # 移動量が閾値を超えたら整数値で移動
-        if abs(GameState.enemy_group_x) >= MOVE_THRESHOLD:
+        if abs(GameState.enemy_group_x) >= Enemy.MOVE_THRESHOLD:
             move_amount = int(GameState.enemy_group_x)
             GameState.enemy_group_x -= move_amount
             
@@ -131,6 +138,9 @@ def update_playing(self):
                 del self.spawn_index
                 GameState.GameStateSub = Config.STATE_PLAYING_FIGHT
 
+    # 星の背景アニメーションは常に更新（ヒットストップの影響を受けない）
+    self.star_manager.update()
+
     # ステージクリア時の処理
     if GameState.GameStateSub == Config.STATE_PLAYING_STAGE_CLEAR:
         if pyxel.btn(pyxel.KEY_Z):
@@ -144,8 +154,6 @@ def update_playing(self):
     if GameState.StopTimer > 0:
         GameState.StopTimer -= 1
         return
-
-    self.star_manager.update()
     self.player.update()
 
     # --- 衝突判定：プレイヤー弾 vs 敵 ---
@@ -249,7 +257,7 @@ class App:
         GameState.GameState = Config.STATE_TITLE
 
         #Bg Stars
-        self.star_manager = StarManager(count=Config.STAR_COUNT)        
+        self.star_manager = StarManager()        
 
         #Player Star Ship
         self.player = Player(64-4, 108)

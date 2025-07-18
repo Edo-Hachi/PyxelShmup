@@ -5,6 +5,7 @@ import random
 from ExplodeManager import ExpMan
 import Config
 import GameState
+from Enemy import Enemy
 
 # Entity Lists - global game object containers
 enemy_list = []
@@ -39,14 +40,14 @@ def update_enemy_attack_selection():
     """Manage enemy attack state selection"""
     GameState.attack_selection_timer += 1
     
-    if GameState.attack_selection_timer >= Config.ATTACK_SELECTION_INTERVAL:
+    if GameState.attack_selection_timer >= Enemy.ATTACK_SELECTION_INTERVAL:
         GameState.attack_selection_timer = 0
         
         # Select enemies in normal state without cooldown
         normal_enemies = [e for e in enemy_list if e.active and e.state == 0 and e.attack_cooldown_timer == 0]
         
         if normal_enemies:
-            if random.random() < Config.ATTACK_CHANCE:
+            if random.random() < Enemy.ATTACK_CHANCE:
                 selected_enemy = random.choice(normal_enemies)
                 selected_enemy.state = 1  # ENEMY_STATE_PREPARE_ATTACK
                 selected_enemy.attack_timer = 0

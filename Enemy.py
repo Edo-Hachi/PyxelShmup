@@ -8,10 +8,6 @@ import math
 from ExplodeManager import ExpType
 from EnemyBullet import EnemyBullet
 
-# Use Config values instead of local constants
-ENEMY_MOVE_SPEED = Config.ENEMY_MOVE_SPEED
-MOVE_THRESHOLD = Config.ENEMY_MOVE_THRESHOLD
-
 # Enemy States
 ENEMY_STATE_ENTERING = -1
 ENEMY_STATE_FORMATION_READY = -2
@@ -23,6 +19,36 @@ ENEMY_STATE_DESCENDING = 4
 ENEMY_STATE_CONTINUOUS_ATTACK = 5
 
 class Enemy:
+    # Enemy Movement Constants
+    MOVE_SPEED = 0.5
+    MOVE_THRESHOLD = 1
+    
+    # Enemy Shooting Constants
+    SHOOT_INTERVAL = 60
+    BASE_SHOOT_CHANCE = 0.10
+    MAX_SHOOT_CHANCE = 0.30
+    ANIM_FRAME = 10
+    COLLISION_BOX = (1, 1, 6, 6)  # x, y, w, h
+    
+    # Enemy Attack System Constants
+    PREPARE_ATTACK_DURATION = 60
+    PREPARE_SHAKE_AMPLITUDE_X = 1.0
+    PREPARE_SHAKE_AMPLITUDE_Y = 1.2
+    PREPARE_SHAKE_FREQUENCY_X = 0.2
+    PREPARE_SHAKE_FREQUENCY_Y = 1.0
+    
+    ATTACK_MOVE_SPEED = 0.8
+    ATTACK_SWAY_AMPLITUDE = 1.5
+    ATTACK_SWAY_FREQUENCY = 0.08
+    RETURN_DELAY = 180
+    RETURN_DELAY_CONTINUOUS = 60
+    DESCEND_SPEED = 1.5
+    FORMATION_PROXIMITY = 8
+    ATTACK_COOLDOWN = 300
+    
+    # Enemy AI Constants
+    ATTACK_SELECTION_INTERVAL = 240
+    ATTACK_CHANCE = 0.75
     def __init__(self, x, y, w=8, h=8, life=1, score=10, sprite_num=1, formation_pos=None, entry_pattern=None):
         self.base_x = x  # 初期X座標を保存
         self.base_y = y  # 初期Y座標を保存（隊列復帰用）
@@ -31,10 +57,10 @@ class Enemy:
         self.w = w  # Sprite Width
         self.h = h  # Sprite Height
 
-        self.col_x = 1 #Collision Box
-        self.col_y = 1
-        self.col_w = 6
-        self.col_h = 6
+        self.col_x = self.COLLISION_BOX[0] #Collision Box
+        self.col_y = self.COLLISION_BOX[1]
+        self.col_w = self.COLLISION_BOX[2]
+        self.col_h = self.COLLISION_BOX[3]
 
         self.Life = life
         self.Score = score
@@ -48,7 +74,7 @@ class Enemy:
         self.animation_speed = self._get_animation_speed()
 
         self.active = True
-        self.shoot_timer = random.randint(0, Config.ENEMY_SHOOT_INTERVAL)  # 発射タイマー
+        self.shoot_timer = random.randint(0, self.SHOOT_INTERVAL)  # 発射タイマー
         
         # 攻撃ステート関連のプロパティ
         self.state = ENEMY_STATE_NORMAL  # 敵の現在の状態
@@ -139,7 +165,7 @@ class Enemy:
             target_y = self.formation_y
 
             # Y-axis movement
-            self.y += Config.DESCEND_SPEED
+            self.y += self.DESCEND_SPEED
 
             # X-axis movement
             x_diff = target_x - self.x
@@ -150,7 +176,7 @@ class Enemy:
 
             # Check for arrival
             distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-            if distance_to_formation <= Config.FORMATION_PROXIMITY or self.y > target_y:
+            if distance_to_formation <= self.FORMATION_PROXIMITY or self.y > target_y:
                 self.x = target_x
                 self.y = target_y
                 self.base_x = target_x
@@ -175,14 +201,14 @@ class Enemy:
         
         # X座標は隊列移動に従う（main.pyで更新される）
         # Y座標のみ上下プルプル動作
-        self.shake_phase_y += Config.PREPARE_SHAKE_FREQUENCY_Y
-        shake_offset_y = math.sin(self.shake_phase_y) * Config.PREPARE_SHAKE_AMPLITUDE_Y
+        self.shake_phase_y += self.PREPARE_SHAKE_FREQUENCY_Y
+        shake_offset_y = math.sin(self.shake_phase_y) * self.PREPARE_SHAKE_AMPLITUDE_Y
         self.y = self.base_y + shake_offset_y
         self.x += move_amount_x # グループ移動を反映
         self.base_x += move_amount_x # base_xも更新
         
         # 準備時間が経過したら攻撃状態に移行
-        if self.attack_timer >= Config.PREPARE_ATTACK_DURATION:
+        if self.attack_timer >= self.PREPARE_ATTACK_DURATION:
             self.state = ENEMY_STATE_ATTACK
             self.attack_timer = 0  # タイマーリセット
 
@@ -192,11 +218,11 @@ class Enemy:
         self.attack_timer += 1
         
         # 下方向に移動
-        self.y += Config.ATTACK_MOVE_SPEED
+        self.y += self.ATTACK_MOVE_SPEED
         
         # 左右の揺れ動作
-        self.sway_phase += Config.ATTACK_SWAY_FREQUENCY
-        sway_offset = math.sin(self.sway_phase) * Config.ATTACK_SWAY_AMPLITUDE
+        self.sway_phase += self.ATTACK_SWAY_FREQUENCY
+        sway_offset = math.sin(self.sway_phase) * self.ATTACK_SWAY_AMPLITUDE
         self.x = self.base_x + sway_offset + move_amount_x # グループ移動を反映
         
         # 画面下に出た場合
@@ -237,7 +263,7 @@ class Enemy:
         self.x += move_amount_x # グループ移動を反映
         
         # 復帰時間が経過したら上から復帰降下開始
-        if self.attack_timer >= Config.RETURN_DELAY:
+        if self.attack_timer >= self.RETURN_DELAY:
             # 画面外に出た時のX座標で上から復帰
             self.x = self.exit_x
             self.y = -16  # 画面上部から開始
@@ -257,7 +283,7 @@ class Enemy:
             return
         
         # 下方向に降下
-        self.y += Config.DESCEND_SPEED
+        self.y += self.DESCEND_SPEED
         
         # 現在の隊列位置（formation_x, formation_y）に向かって移動
         target_x = self.formation_x
@@ -273,14 +299,14 @@ class Enemy:
         
         # 隊列位置に近づいたかチェック
         distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-        if distance_to_formation <= Config.FORMATION_PROXIMITY:
+        if distance_to_formation <= self.FORMATION_PROXIMITY:
             # 隊列に復帰
             self.x = target_x
             self.y = target_y
             self.base_x = target_x  # base_xも更新
             self.base_y = target_y  # base_yも更新
             self.state = ENEMY_STATE_NORMAL  # 通常状態に戻る
-            self.attack_cooldown_timer = Config.ATTACK_COOLDOWN  # 攻撃クールダウン開始
+            self.attack_cooldown_timer = self.ATTACK_COOLDOWN  # 攻撃クールダウン開始
 
     def _update_continuous_attack(self, move_amount_x):
         """連続攻撃モード処理"""
@@ -293,7 +319,7 @@ class Enemy:
         self.x += move_amount_x # グループ移動を反映
         
         # 短い復帰時間が経過したら再び攻撃開始
-        if self.attack_timer >= Config.RETURN_DELAY_CONTINUOUS:
+        if self.attack_timer >= self.RETURN_DELAY_CONTINUOUS:
             # ランダムなX座標で上から再出現
             self.x = random.randint(8, Config.WIN_WIDTH - 16)
             self.y = -16  # 画面上部から開始
@@ -313,18 +339,18 @@ class Enemy:
                 if remaining_enemies > 0:
                     if self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
                         # 連続攻撃モードの敵は高い発射確率
-                        shoot_chance = Config.ENEMY_MAX_SHOOT_CHANCE
+                        shoot_chance = self.MAX_SHOOT_CHANCE
                     else:
                         # 通常状態の敵：敵の数が減るほど発射確率が上がる
                         shoot_chance = min(
-                            Config.ENEMY_BASE_SHOOT_CHANCE + (Config.ENEMY_BASE_SHOOT_CHANCE * (40 - remaining_enemies) / 40),
-                            Config.ENEMY_MAX_SHOOT_CHANCE
+                            self.BASE_SHOOT_CHANCE + (self.BASE_SHOOT_CHANCE * (40 - remaining_enemies) / 40),
+                            self.MAX_SHOOT_CHANCE
                         )
                     if random.random() < shoot_chance:  # 確率で発射
                         Common.enemy_bullet_list.append(
                             EnemyBullet(self.x + 4, self.y + 8)  # エネミーの中心から発射
                         )
-                self.shoot_timer = Config.ENEMY_SHOOT_INTERVAL
+                self.shoot_timer = self.SHOOT_INTERVAL
 
     def on_hit(self, bullet):
         # 弾を消す

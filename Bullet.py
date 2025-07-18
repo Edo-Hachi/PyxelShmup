@@ -4,17 +4,21 @@ import Config
 import GameState
 from SpriteManager import sprite_manager
 
+# Bullet専用設定
+BULLET_SPEED = 3
+BULLET_COLLISION_BOX = (2, 2, 4, 4)  # x, y, w, h
+
 class Bullet:
     def __init__(self, x, y, w, h):
         self.x = x
         self.y = y
         self.w = w
         self.h = h
-        self.speed = Config.BULLET_SPEED
+        self.speed = BULLET_SPEED
         self.active = True
         
         # Collision box
-        self.col_x, self.col_y, self.col_w, self.col_h = Config.BULLET_COLLISION_BOX
+        self.col_x, self.col_y, self.col_w, self.col_h = BULLET_COLLISION_BOX
         
         # アニメーション設定をJSONから取得
         self.animation_speed = self._get_animation_speed()

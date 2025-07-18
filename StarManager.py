@@ -11,14 +11,22 @@ class Star:
     speed: float
 
 class StarManager:
-    def __init__(self, count=100):
+    # Star Constants
+    COUNT = 100
+    SPEED = 0.5
+    MIN_SPEED = 0.1
+    MAX_SPEED = 3.0
+    
+    def __init__(self, count=None):
+        if count is None:
+            count = self.COUNT
         self.stars = [
             Star(
                 random.randint(0, Config.WIN_WIDTH - 1),
                 random.randint(0, Config.WIN_HEIGHT - 1),
                 random.randint(2, 15),  #Color
                 #random.randint(1, 3)   #Speed  
-                random.uniform(0.1, 3.0) #Speed
+                random.uniform(self.MIN_SPEED, self.MAX_SPEED) #Speed
             )
             for _ in range(count)
         ]

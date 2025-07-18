@@ -4,14 +4,17 @@ import Config
 from SpriteManager import sprite_manager
 
 class EnemyBullet:
+    # EnemyBullet Constants
+    SPEED = 2
+    COLLISION_BOX = (2, 2, 4, 4)  # x, y, w, h
     def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.speed = Config.ENEMY_BULLET_SPEED
+        self.speed = self.SPEED
         self.active = True
         
         # Collision box
-        self.col_x, self.col_y, self.col_w, self.col_h = Config.ENEMY_BULLET_COLLISION_BOX
+        self.col_x, self.col_y, self.col_w, self.col_h = self.COLLISION_BOX
 
     def update(self):
         self.y += self.speed

@@ -218,10 +218,17 @@ class Explode_DOT_REFRECT:
 
 # class ExplodeManager:
 class ExpMan:
+    # Explosion Constants
+    PARTICLE_COUNT = 20
+    PARTICLE_SPEED = 3
+    DURATION = 60
+    
     def __init__(self):
         self.explosions = []
 
-    def spawn_explosion(self, x, y, cnt=20, exp_type=ExpType.CIRCLE):
+    def spawn_explosion(self, x, y, cnt=None, exp_type=ExpType.CIRCLE):
+        if cnt is None:
+            cnt = self.PARTICLE_COUNT
         """Spawn explosion particles of specified type."""
         particle_cls = {
             ExpType.RECT: Explode_RECT,

@@ -20,6 +20,12 @@ MuzlStarIndex = 2
 
 # Use Config values instead of local constants
 
+# Player専用設定
+PLAYER_SPEED = 1
+PLAYER_COLLISION_BOX = (2, 2, 4, 4)  # x, y, w, h
+PLAYER_SHOT_INTERVAL = 16
+PLAYER_EXPLODE_TIMER = 180
+
 class Player:
     def __init__(self, x, y):
         self.x = x
@@ -34,7 +40,7 @@ class Player:
 
         self.speed = 1
         self.col_active = True
-        self.ShotTimer = Config.PLAYER_SHOT_INTERVAL
+        self.ShotTimer = PLAYER_SHOT_INTERVAL
 
         self.ExplodeCoolTimer = -1
         self.NowExploding = False
@@ -98,10 +104,10 @@ class Player:
         #弾の発射
         if pyxel.btn(pyxel.KEY_SPACE):
             if(self.ShotTimer <= 0):
-                pyxel.play(Config.AUDIO_CHANNEL_PLAYER, 0)  # 効果音再生
+                pyxel.play(0, 0)  # 効果音再生
                 Common.player_bullet_list.append(Bullet(self.x-4, self.y-4, 8, 8)) # 弾の情報をリストに追加
                 Common.player_bullet_list.append(Bullet(self.x+4, self.y-4, 8, 8)) # 弾の情報をリストに追加
-                self.ShotTimer = Config.PLAYER_SHOT_INTERVAL  # 再発射までの時間をリセット
+                self.ShotTimer = PLAYER_SHOT_INTERVAL  # 再発射までの時間をリセット
 
                 self.MuzlFlash = MuzlStarIndex  # Muzzle Flash Animate Start
 
@@ -162,7 +168,7 @@ class Player:
                 self.x + 4, self.y + 4, 20, ExpType.CIRCLE
             )
             # クールタイム設定
-            self.ExplodeCoolTimer = Config.PLAYER_EXPLODE_TIMER
+            self.ExplodeCoolTimer = PLAYER_EXPLODE_TIMER
             self.NowExploding = True
             # 画面効果
             GameState.ShakeTimer = Config.SHAKE_TIME

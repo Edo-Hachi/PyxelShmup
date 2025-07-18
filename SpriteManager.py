@@ -60,9 +60,7 @@ SpIdx = namedtuple("SprIdx", ["x", "y"])
 #     "ENEMY05_3": SpIdx(160, 8),   # Enemy05_3
 # }
 
-# Legacy constants (kept for backward compatibility if needed)
-MAX_ENEMY_NUM = 5
-MAX_ANIM_PAT = 4
+# Legacy constants removed - no longer needed with JSON-driven system
 
 
 # JSON-based Sprite Management

@@ -123,10 +123,20 @@ def update_playing(self):
                     # ウェーブ共通のランダムY座標を使用
                     random_entry_y = wave.get("random_entry_y", None)
                     
-                    # 敵生成（登場パターン対応 + デバッグ情報）
+                    # 敵生成（登場パターン対応 + デバッグ情報 + EntryPattern統合テスト）
+                    # テスト: 1行目はLeftLoop(1)、2行目はRightLoop(2)、3行目はZigzag(3)、4行目は従来の水平移動
+                    if row == 0:
+                        test_pattern_id = 1  # LeftLoopPattern
+                    elif row == 1:
+                        test_pattern_id = 2  # RightLoopPattern
+                    elif row == 2:
+                        test_pattern_id = 3  # ZigzagPattern
+                    else:
+                        test_pattern_id = None  # 従来の水平移動
+                    
                     _Enemy = Enemy(x=enemy_x, y=enemy_y, sprite_num=sprite_num, w=8, h=8, life=2, score=100, 
                                  entry_pattern=entry_pattern, entry_y=random_entry_y, 
-                                 wave_id=row, enemy_index=wave["spawn_index"])
+                                 wave_id=row, enemy_index=wave["spawn_index"], entry_pattern_id=test_pattern_id)
                     Common.enemy_list.append(_Enemy)
                     
                     wave["spawn_index"] += 1

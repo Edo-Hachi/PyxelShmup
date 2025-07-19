@@ -7,6 +7,7 @@ import Common
 import Config
 import GameState
 from SpriteManager import sprite_manager
+from EntryPatterns import EntryPatternFactory
 import random
 import math
 
@@ -23,30 +24,43 @@ class Enemy:
     MOVE_SPEED = 0.5                    # 隊列移動速度
     COLLISION_BOX = (1, 1, 6, 6)       # 当たり判定ボックス
     
-    def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10, entry_pattern: str = None, entry_y: float = None, wave_id: int = -1, enemy_index: int = -1):
+    def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10, entry_pattern: str = None, entry_y: float = None, wave_id: int = -1, enemy_index: int = -1, entry_pattern_id: int = None):
         """
-        敵の初期化 - 登場シーケンス対応
+        敵の初期化 - 登場シーケンス対応（EntryPattern統合版）
         座標管理をformation_x/y + x/yの2つのみに単純化
         """
         # 隊列内での位置（理論位置・最終目標位置）
         self.formation_x = float(x)     # 隊列内X座標
         self.formation_y = float(y)     # 隊列内Y座標
         
-        # 実際の表示位置
-        if entry_pattern == "left_horizontal":
-            # 左から水平移動パターンの場合は画面左外から開始
-            self.x = -16.0              # 画面左外から開始
-            # Y座標はウェーブ共通のランダム登場位置
-            self.entry_y = entry_y if entry_y is not None else 64  # 外部から指定、なければデフォルト
+        # EntryPatternシステム統合
+        self.entry_pattern_obj = EntryPatternFactory.create(entry_pattern_id) if entry_pattern_id else None
+        self.entry_pattern_str = entry_pattern  # 従来の文字列パターン
+        self.entry_timer = 0
+        
+        # 実際の表示位置の初期化
+        if self.entry_pattern_obj:
+            # EntryPatternを使用する場合
+            init_x, init_y = EntryPatternFactory.get_initial_position(entry_pattern_id)
+            self.x = float(init_x)
+            self.y = float(init_y)
+            self.state = ENEMY_STATE_ENTRY_SEQUENCE
+            if Config.DEBUG:
+                print(f"Enemy created with EntryPattern {entry_pattern_id}: init=({init_x},{init_y}), target=({x},{y})")
+        elif entry_pattern == "left_horizontal":
+            # 左から水平移動パターン（従来）
+            self.x = -16.0
+            self.entry_y = entry_y if entry_y is not None else 64
             self.y = float(self.entry_y)
+            self.state = ENEMY_STATE_ENTRY_SEQUENCE
             if Config.DEBUG:
                 print(f"Left enemy created: entry_y={self.entry_y}, target_y={self.formation_y}")
         elif entry_pattern == "right_horizontal":
-            # 右から水平移動パターンの場合は画面右外から開始
-            self.x = Config.WIN_WIDTH + 8.0  # 画面右外から開始（128 + 8 = 136）
-            # Y座標はウェーブ共通のランダム登場位置
-            self.entry_y = entry_y if entry_y is not None else 64  # 外部から指定、なければデフォルト
+            # 右から水平移動パターン（従来）
+            self.x = Config.WIN_WIDTH + 8.0
+            self.entry_y = entry_y if entry_y is not None else 64
             self.y = float(self.entry_y)
+            self.state = ENEMY_STATE_ENTRY_SEQUENCE
             if Config.DEBUG:
                 print(f"Right enemy created: entry_y={self.entry_y}, target_y={self.formation_y}")
         else:
@@ -95,7 +109,7 @@ class Enemy:
         
         # 初期状態をログ出力
         if Config.DEBUG and (self.enemy_index == 0 or self.enemy_index == 9):  # 最初と最後の敵のみ
-            print(f"[{self.enemy_id}] Created: state={self.state}, pattern={entry_pattern}, entry_y={getattr(self, 'entry_y', 'N/A')}")
+            print(f"[{self.enemy_id}] Created: state={self.state}, pattern={self.entry_pattern_str}, entry_y={getattr(self, 'entry_y', 'N/A')}")
 
     def _log_state_change(self, old_state: int, new_state: int, reason: str = ""):
         """状態変更をログ出力（最初と最後の敵のみ）"""
@@ -126,31 +140,40 @@ class Enemy:
             self._update_normal()
     
     def _update_entry_sequence(self):
-        """登場シーケンス処理 - 左右から水平移動（Y座標固定）"""
-        screen_center_x = Config.WIN_WIDTH // 2
-        
-        if self.entry_pattern == "left_horizontal":
-            # 画面中央（64px）まで右に移動
-            if self.x < screen_center_x:
-                self.x += self.ENTRY_MOVE_SPEED
-                # Y座標は登場時のentry_yで固定（変化させない）
-                # self.y は初期化時に設定された entry_y のまま維持
-            else:
-                # 画面中央到達 -> ホームポジション移動開始
+        """登場シーケンス処理 - EntryPattern統合版"""
+        if self.entry_pattern_obj:
+            # EntryPatternを使用
+            formation_reached = self.entry_pattern_obj.update(self)
+            if formation_reached:
+                # EntryPatternが完了してホームポジションに到達
+                old_state = self.state
+                self.state = ENEMY_STATE_HOME_REACHED
+                self._log_state_change(old_state, self.state, "EntryPattern completed")
+            elif hasattr(self.entry_pattern_obj, 'moving_to_formation') and self.entry_pattern_obj.moving_to_formation:
+                # EntryPatternがホームポジション移動中
                 old_state = self.state
                 self.state = ENEMY_STATE_MOVING_TO_HOME
-                self._log_state_change(old_state, self.state, "reached center from left")
-        elif self.entry_pattern == "right_horizontal":
-            # 画面中央（64px）まで左に移動
-            if self.x > screen_center_x:
-                self.x -= self.ENTRY_MOVE_SPEED
-                # Y座標は登場時のentry_yで固定（変化させない）
-                # self.y は初期化時に設定された entry_y のまま維持
-            else:
-                # 画面中央到達 -> ホームポジション移動開始
-                old_state = self.state
-                self.state = ENEMY_STATE_MOVING_TO_HOME
-                self._log_state_change(old_state, self.state, "reached center from right")
+                self._log_state_change(old_state, self.state, "EntryPattern moving to formation")
+        else:
+            # 従来の水平移動パターン
+            screen_center_x = Config.WIN_WIDTH // 2
+            
+            if self.entry_pattern_str == "left_horizontal":
+                # 画面中央（64px）まで右に移動
+                if self.x < screen_center_x:
+                    self.x += self.ENTRY_MOVE_SPEED
+                else:
+                    old_state = self.state
+                    self.state = ENEMY_STATE_MOVING_TO_HOME
+                    self._log_state_change(old_state, self.state, "reached center from left")
+            elif self.entry_pattern_str == "right_horizontal":
+                # 画面中央（64px）まで左に移動
+                if self.x > screen_center_x:
+                    self.x -= self.ENTRY_MOVE_SPEED
+                else:
+                    old_state = self.state
+                    self.state = ENEMY_STATE_MOVING_TO_HOME
+                    self._log_state_change(old_state, self.state, "reached center from right")
     
     def _update_moving_to_home(self):
         """ホームポジション移動処理"""

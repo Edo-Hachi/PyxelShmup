@@ -1,0 +1,30 @@
+Implement alternating left-right enemy entry patterns with wave-based random Y coordinates
+
+## Features Added
+- Added right_horizontal entry pattern to complement left_horizontal
+- Implemented alternating wave entry (even rows: left, odd rows: right)
+- Added wave-based random Y coordinate generation (64±32 range)
+- Unified Y coordinates within each wave for formation cohesion
+
+## Technical Improvements
+- Fixed Y-coordinate drift bug in entry sequence processing
+- Added comprehensive debug tracking for wave management
+- Implemented enemy ID system (W0E00-W3E09) for detailed state monitoring
+- Enhanced state transition logging for first and last enemies in each wave
+
+## State Management
+- Complete state flow: ENTRY_SEQUENCE → MOVING_TO_HOME → HOME_REACHED → NORMAL
+- Verified all 4 waves (40 enemies) complete proper state transitions
+- Confirmed formation movement starts correctly after all waves complete
+
+## Debug Features
+- Added wave-based enemy identification and state transition logging
+- Enhanced debug output for entry sequence monitoring
+- Implemented detailed tracking for wave completion verification
+
+This establishes a robust foundation for future complex entry patterns (loops, spirals, etc.)
+and provides comprehensive debugging capabilities for wave management systems.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>

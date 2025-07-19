@@ -107,8 +107,26 @@ def update_playing(self):
                     enemy_x = OFSX + (BASEX * _x)
                     sprite_num = get_current_stage_map()[_y][_x]
                     
-                    # シンプルな敵生成（新しいコンストラクタに合わせる）
-                    _Enemy = Enemy(x=enemy_x, y=enemy_y, sprite_num=sprite_num, w=8, h=8, life=2, score=100)  # 通常の体力に戻す
+                    # 登場パターンの設定（左右交互：偶数行は左から、奇数行は右から）
+                    if _y % 2 == 0:  # 偶数行（0,2行目）は左から水平移動
+                        entry_pattern = "left_horizontal"
+                    else:  # 奇数行（1,3行目）は右から水平移動
+                        entry_pattern = "right_horizontal"
+                    
+                    # ウェーブ単位でランダムY座標を生成（初回のみ）
+                    if wave["spawn_index"] == 0 and entry_pattern in ["left_horizontal", "right_horizontal"]:
+                        # 64±32の範囲でランダムY座標を生成
+                        wave["random_entry_y"] = 64 + random.randint(-32, 32)
+                        if Config.DEBUG:
+                            print(f"Wave {row} ({entry_pattern}): Generated random entry_y = {wave['random_entry_y']}")
+                    
+                    # ウェーブ共通のランダムY座標を使用
+                    random_entry_y = wave.get("random_entry_y", None)
+                    
+                    # 敵生成（登場パターン対応 + デバッグ情報）
+                    _Enemy = Enemy(x=enemy_x, y=enemy_y, sprite_num=sprite_num, w=8, h=8, life=2, score=100, 
+                                 entry_pattern=entry_pattern, entry_y=random_entry_y, 
+                                 wave_id=row, enemy_index=wave["spawn_index"])
                     Common.enemy_list.append(_Enemy)
                     
                     wave["spawn_index"] += 1
@@ -119,19 +137,25 @@ def update_playing(self):
             
             # 入場中のウェーブの完了チェック
             elif state == 2:  # ENTERING
-                # 現在の行の全敵の簡易チェック（新Enemy.py用）
-                current_row_enemies = [e for e in Common.enemy_list if e.active]
-                ready_enemies = current_row_enemies  # 新Enemy.pyでは即座にready状態
+                # 現在の行の全敵をスポーン順序で特定（row基準）
+                current_row_enemies = [e for e in Common.enemy_list if e.active and abs(e.formation_y - (OFSY + BASEY * row)) < 5]
                 
-                # デバッグ情報（新Enemy.py用）
+                # ホームポジション到達済みの敵をカウント
+                ready_enemies = [e for e in current_row_enemies if e.is_ready_for_formation_movement()]
+                
+                # デバッグ情報（登場シーケンス対応）
                 if Config.DEBUG and len(current_row_enemies) > 0:
-                    print(f"Wave {row}: Total={len(current_row_enemies)}, Ready={len(ready_enemies)}")
+                    entry_enemies = [e for e in current_row_enemies if e.state == -1]  # ENTRY_SEQUENCE
+                    moving_enemies = [e for e in current_row_enemies if e.state == -2]  # MOVING_TO_HOME
+                    reached_enemies = [e for e in current_row_enemies if e.state == -3]  # HOME_REACHED
+                    normal_enemies = [e for e in current_row_enemies if e.state == 0]  # NORMAL
+                    print(f"Wave {row}: Total={len(current_row_enemies)}, Entry={len(entry_enemies)}, Moving={len(moving_enemies)}, Reached={len(reached_enemies)}, Normal={len(normal_enemies)}")
                 
-                # 入場完了判定
+                # 入場完了判定（全員がホームポジション到達済み）
                 if len(ready_enemies) == len(current_row_enemies) and len(current_row_enemies) > 0:
                     wave["state"] = 3  # COMPLETED状態へ遷移
                     if Config.DEBUG:
-                        print(f"Wave {row} completed! Triggering next wave.")
+                        print(f"Wave {row} completed! All enemies reached home position. Triggering next wave.")
                     
                     # 次のウェーブを起動
                     next_wave_index = row + 1
@@ -141,14 +165,29 @@ def update_playing(self):
         # 全ウェーブ完了チェック
         all_completed = all(wave["state"] == 3 for wave in self.wave_queue)
         if all_completed:
-            # 全隊列の出現・入場完了、戦闘開始（新Enemy.py用）
-            active_count = len([e for e in Common.enemy_list if e.active])
-            if active_count == 0:
-                # 全員倒された場合は即クリア判定へ
+            # 全隊列の出現・入場完了判定
+            active_enemies = [e for e in Common.enemy_list if e.active]
+            all_ready_for_formation = [e for e in active_enemies if e.is_ready_for_formation_movement()]
+            
+            if len(active_enemies) == 0:
+                # 全員撃墜された場合は即クリア判定へ
                 GameState.GameStateSub = Config.STATE_PLAYING_STAGE_CLEAR
-            else:
-                # 戦闘開始（新Enemy.pyでは状態管理なし）
+                if Config.DEBUG:
+                    print("All enemies destroyed during entry sequence! Stage clear.")
+            elif len(all_ready_for_formation) == len(active_enemies):
+                # 全員がホームポジション到達・隊列移動準備完了
+                # 全敵をNORMAL状態に遷移
+                for enemy in active_enemies:
+                    if enemy.state == -3:  # HOME_REACHED
+                        old_state = enemy.state
+                        enemy.state = 0  # NORMAL
+                        # 最初と最後の敵の状態遷移をログ出力
+                        if hasattr(enemy, '_log_state_change'):
+                            enemy._log_state_change(old_state, enemy.state, "all waves completed")
+                
                 GameState.GameStateSub = Config.STATE_PLAYING_FIGHT
+                if Config.DEBUG:
+                    print(f"All waves completed! {len(active_enemies)} enemies ready for formation movement. Starting battle.")
             
             # クリーンアップ
             if hasattr(self, 'spawn_timer'):

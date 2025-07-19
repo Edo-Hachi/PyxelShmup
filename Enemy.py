@@ -8,9 +8,13 @@ import Config
 import GameState
 from SpriteManager import sprite_manager
 import random
+import math
 
-# Enemy States - 最初は基本状態のみ
-ENEMY_STATE_NORMAL = 0          # 通常の隊列移動
+# Enemy States - 登場シーケンス対応
+ENEMY_STATE_ENTRY_SEQUENCE = -1     # 登場シーケンス中（左から水平移動等）
+ENEMY_STATE_MOVING_TO_HOME = -2     # ホームポジション移動中
+ENEMY_STATE_HOME_REACHED = -3       # ホームポジション到達・待機中
+ENEMY_STATE_NORMAL = 0              # 通常の隊列移動
 
 class Enemy:
     """シンプルな敵クラス - 基本的な隊列移動のみ"""
@@ -19,18 +23,36 @@ class Enemy:
     MOVE_SPEED = 0.5                    # 隊列移動速度
     COLLISION_BOX = (1, 1, 6, 6)       # 当たり判定ボックス
     
-    def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10):
+    def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10, entry_pattern: str = None, entry_y: float = None, wave_id: int = -1, enemy_index: int = -1):
         """
-        シンプルな敵の初期化
+        敵の初期化 - 登場シーケンス対応
         座標管理をformation_x/y + x/yの2つのみに単純化
         """
-        # 隊列内での位置（理論位置）
+        # 隊列内での位置（理論位置・最終目標位置）
         self.formation_x = float(x)     # 隊列内X座標
         self.formation_y = float(y)     # 隊列内Y座標
         
         # 実際の表示位置
-        self.x = float(x)               # 表示X座標  
-        self.y = float(y)               # 表示Y座標
+        if entry_pattern == "left_horizontal":
+            # 左から水平移動パターンの場合は画面左外から開始
+            self.x = -16.0              # 画面左外から開始
+            # Y座標はウェーブ共通のランダム登場位置
+            self.entry_y = entry_y if entry_y is not None else 64  # 外部から指定、なければデフォルト
+            self.y = float(self.entry_y)
+            if Config.DEBUG:
+                print(f"Left enemy created: entry_y={self.entry_y}, target_y={self.formation_y}")
+        elif entry_pattern == "right_horizontal":
+            # 右から水平移動パターンの場合は画面右外から開始
+            self.x = Config.WIN_WIDTH + 8.0  # 画面右外から開始（128 + 8 = 136）
+            # Y座標はウェーブ共通のランダム登場位置
+            self.entry_y = entry_y if entry_y is not None else 64  # 外部から指定、なければデフォルト
+            self.y = float(self.entry_y)
+            if Config.DEBUG:
+                print(f"Right enemy created: entry_y={self.entry_y}, target_y={self.formation_y}")
+        else:
+            # デフォルトは即座に隊列位置
+            self.x = float(x)
+            self.y = float(y)
         
         # スプライト設定
         self.w = w                      # スプライト幅
@@ -49,19 +71,121 @@ class Enemy:
         self.active = True
         self.flash = 0                  # ヒット時の点滅
         
-        # 状態管理
-        self.state = ENEMY_STATE_NORMAL
+        # 状態管理 - 登場シーケンス対応
+        if entry_pattern in ["left_horizontal", "right_horizontal"]:
+            self.state = ENEMY_STATE_ENTRY_SEQUENCE
+        else:
+            self.state = ENEMY_STATE_NORMAL
+        
+        # 登場パターン情報
+        self.entry_pattern = entry_pattern
+        
+        # デバッグ用識別情報
+        self.wave_id = wave_id              # ウェーブID (0-3)
+        self.enemy_index = enemy_index      # ウェーブ内での順番 (0-9)
+        self.enemy_id = f"W{wave_id}E{enemy_index:02d}"  # 一意なID (例: W0E00, W1E09)
+        
+        # 移動・到達判定用の定数
+        self.ENTRY_MOVE_SPEED = 1.5         # 登場時の移動速度
+        self.HOME_MOVE_SPEED = 2.0          # ホームポジション移動速度  
+        self.HOME_PROXIMITY_THRESHOLD = 4.0 # ホームポジション到達判定の閾値
         
         # JSON駆動アニメーション
         self.animation_speed = self._get_animation_speed()
+        
+        # 初期状態をログ出力
+        if Config.DEBUG and (self.enemy_index == 0 or self.enemy_index == 9):  # 最初と最後の敵のみ
+            print(f"[{self.enemy_id}] Created: state={self.state}, pattern={entry_pattern}, entry_y={getattr(self, 'entry_y', 'N/A')}")
+
+    def _log_state_change(self, old_state: int, new_state: int, reason: str = ""):
+        """状態変更をログ出力（最初と最後の敵のみ）"""
+        if Config.DEBUG and (self.enemy_index == 0 or self.enemy_index == 9):
+            state_names = {
+                -1: "ENTRY_SEQUENCE",
+                -2: "MOVING_TO_HOME", 
+                -3: "HOME_REACHED",
+                0: "NORMAL"
+            }
+            old_name = state_names.get(old_state, f"UNKNOWN({old_state})")
+            new_name = state_names.get(new_state, f"UNKNOWN({new_state})")
+            reason_str = f" ({reason})" if reason else ""
+            print(f"[{self.enemy_id}] State: {old_name} -> {new_name}{reason_str}")
 
     def update(self):
         """
-        敵の更新処理
+        敵の更新処理 - 登場シーケンス対応
         隊列移動はmain.pyで一括処理される
         """
-        if self.state == ENEMY_STATE_NORMAL:
+        if self.state == ENEMY_STATE_ENTRY_SEQUENCE:
+            self._update_entry_sequence()
+        elif self.state == ENEMY_STATE_MOVING_TO_HOME:
+            self._update_moving_to_home()
+        elif self.state == ENEMY_STATE_HOME_REACHED:
+            self._update_home_reached()
+        elif self.state == ENEMY_STATE_NORMAL:
             self._update_normal()
+    
+    def _update_entry_sequence(self):
+        """登場シーケンス処理 - 左右から水平移動（Y座標固定）"""
+        screen_center_x = Config.WIN_WIDTH // 2
+        
+        if self.entry_pattern == "left_horizontal":
+            # 画面中央（64px）まで右に移動
+            if self.x < screen_center_x:
+                self.x += self.ENTRY_MOVE_SPEED
+                # Y座標は登場時のentry_yで固定（変化させない）
+                # self.y は初期化時に設定された entry_y のまま維持
+            else:
+                # 画面中央到達 -> ホームポジション移動開始
+                old_state = self.state
+                self.state = ENEMY_STATE_MOVING_TO_HOME
+                self._log_state_change(old_state, self.state, "reached center from left")
+        elif self.entry_pattern == "right_horizontal":
+            # 画面中央（64px）まで左に移動
+            if self.x > screen_center_x:
+                self.x -= self.ENTRY_MOVE_SPEED
+                # Y座標は登場時のentry_yで固定（変化させない）
+                # self.y は初期化時に設定された entry_y のまま維持
+            else:
+                # 画面中央到達 -> ホームポジション移動開始
+                old_state = self.state
+                self.state = ENEMY_STATE_MOVING_TO_HOME
+                self._log_state_change(old_state, self.state, "reached center from right")
+    
+    def _update_moving_to_home(self):
+        """ホームポジション移動処理"""
+        # 目標位置への移動
+        target_x = self.formation_x
+        target_y = self.formation_y
+        
+        # X方向の移動
+        x_diff = target_x - self.x
+        if abs(x_diff) > 1:
+            self.x += math.copysign(min(abs(x_diff), self.HOME_MOVE_SPEED), x_diff)
+        else:
+            self.x = target_x
+        
+        # Y方向の移動
+        y_diff = target_y - self.y
+        if abs(y_diff) > 1:
+            self.y += math.copysign(min(abs(y_diff), self.HOME_MOVE_SPEED), y_diff)
+        else:
+            self.y = target_y
+        
+        # 到達判定
+        distance_to_home = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
+        if distance_to_home <= self.HOME_PROXIMITY_THRESHOLD:
+            self.x = target_x
+            self.y = target_y
+            old_state = self.state
+            self.state = ENEMY_STATE_HOME_REACHED
+            self._log_state_change(old_state, self.state, f"reached home (distance={distance_to_home:.1f})")
+    
+    def _update_home_reached(self):
+        """ホームポジション到達・待機状態"""
+        # ホームポジションで待機（隊列移動は別処理）
+        self.x = self.formation_x
+        self.y = self.formation_y
     
     def _update_normal(self):
         """通常状態の更新処理 - 隊列位置と表示位置を同期"""
@@ -77,8 +201,12 @@ class Enemy:
         self.formation_y += move_y
     
     def is_in_formation(self) -> bool:
-        """隊列にいるかどうかの判定"""
+        """隊列にいるかどうかの判定 - 登場シーケンス対応"""
         return self.state == ENEMY_STATE_NORMAL
+    
+    def is_ready_for_formation_movement(self) -> bool:
+        """隊列移動準備完了かどうかの判定"""
+        return self.state in [ENEMY_STATE_HOME_REACHED, ENEMY_STATE_NORMAL]
     
     def get_left_edge(self) -> float:
         """左端座標を取得"""

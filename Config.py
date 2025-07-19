@@ -11,7 +11,7 @@ VERSION = "0.1.6"
 LAUNCH_DATE = "2025/07/17"
 
 # Development Settings
-DEBUG = False
+DEBUG = False  # デバッグ出力を無効化してゲームプレイに集中
 
 # Window Settings
 WIN_WIDTH = 128

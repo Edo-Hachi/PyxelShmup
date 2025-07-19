@@ -1,7 +1,6 @@
-#ソースコードの中のコメントは日本語にしましょう
-# #画面に出力する文字列は英語にしてください。pyxelは日本語フォントを表示できません
-# CLAUDE.md を書き込むときは英語にしてください
-# 変数の型は宣言してください
+# Enemy.py - Simplified Enemy Management
+# シンプルで理解しやすい敵管理システム
+# 座標管理の単純化とFormationIssue.mdの提案を反映
 
 import pyxel
 import Common
@@ -9,381 +8,124 @@ import Config
 import GameState
 from SpriteManager import sprite_manager
 import random
-import math
-from ExplodeManager import ExpType
-from EnemyBullet import EnemyBullet
-from EntryPatterns import EntryPatternFactory
 
-# Enemy States
-ENEMY_STATE_ENTERING = -1
-ENEMY_STATE_FORMATION_READY = -2
-ENEMY_STATE_NORMAL = 0
-ENEMY_STATE_PREPARE_ATTACK = 1
-ENEMY_STATE_ATTACK = 2
-ENEMY_STATE_RETURNING = 3
-ENEMY_STATE_DESCENDING = 4
-ENEMY_STATE_CONTINUOUS_ATTACK = 5
+# Enemy States - 最初は基本状態のみ
+ENEMY_STATE_NORMAL = 0          # 通常の隊列移動
 
 class Enemy:
-    # Enemy Movement Constants
-    MOVE_SPEED = 0.5
-    MOVE_THRESHOLD = 1
+    """シンプルな敵クラス - 基本的な隊列移動のみ"""
     
-    # Enemy Shooting Constants
-    SHOOT_INTERVAL = 60
-    BASE_SHOOT_CHANCE = 0.10
-    MAX_SHOOT_CHANCE = 0.30
-    ANIM_FRAME = 10
-    COLLISION_BOX = (1, 1, 6, 6)  # x, y, w, h
+    # Constants
+    MOVE_SPEED = 0.5                    # 隊列移動速度
+    COLLISION_BOX = (1, 1, 6, 6)       # 当たり判定ボックス
     
-    # Enemy Attack System Constants
-    PREPARE_ATTACK_DURATION = 60
-    PREPARE_SHAKE_AMPLITUDE_X = 1.0
-    PREPARE_SHAKE_AMPLITUDE_Y = 1.2
-    PREPARE_SHAKE_FREQUENCY_X = 0.2
-    PREPARE_SHAKE_FREQUENCY_Y = 1.0
-    
-    ATTACK_MOVE_SPEED = 0.8
-    ATTACK_SWAY_AMPLITUDE = 1.5
-    ATTACK_SWAY_FREQUENCY = 0.08
-    RETURN_DELAY = 180
-    RETURN_DELAY_CONTINUOUS = 60
-    DESCEND_SPEED = 1.5
-    FORMATION_PROXIMITY = 8
-    ATTACK_COOLDOWN = 300
-    
-    # Enemy AI Constants
-    ATTACK_SELECTION_INTERVAL = 240
-    ATTACK_CHANCE = 0.75
-    def __init__(self, x, y, w=8, h=8, life=1, score=10, sprite_num=1, formation_pos=None, entry_pattern=None):
-        self.base_x = x  # 初期X座標を保存
-        self.base_y = y  # 初期Y座標を保存（隊列復帰用）
-        self.x = x
-        self.y = y
-        self.w = w  # Sprite Width
-        self.h = h  # Sprite Height
-
-        self.col_x = self.COLLISION_BOX[0] #Collision Box
-        self.col_y = self.COLLISION_BOX[1]
+    def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10):
+        """
+        シンプルな敵の初期化
+        座標管理をformation_x/y + x/yの2つのみに単純化
+        """
+        # 隊列内での位置（理論位置）
+        self.formation_x = float(x)     # 隊列内X座標
+        self.formation_y = float(y)     # 隊列内Y座標
+        
+        # 実際の表示位置
+        self.x = float(x)               # 表示X座標  
+        self.y = float(y)               # 表示Y座標
+        
+        # スプライト設定
+        self.w = w                      # スプライト幅
+        self.h = h                      # スプライト高さ
+        self.sprite_num = sprite_num    # 敵種類（1-5）
+        
+        # 当たり判定
+        self.col_x = self.COLLISION_BOX[0]
+        self.col_y = self.COLLISION_BOX[1] 
         self.col_w = self.COLLISION_BOX[2]
         self.col_h = self.COLLISION_BOX[3]
-
-        self.Life = life
-        self.Score = score
-
-        self.flash = 0
-
-        # Enemy sprite id (1-5)
-        self.sprite_num = sprite_num
         
-        # アニメーション設定をJSONから取得
+        # ゲーム属性
+        self.life = life
+        self.score = score
+        self.active = True
+        self.flash = 0                  # ヒット時の点滅
+        
+        # 状態管理
+        self.state = ENEMY_STATE_NORMAL
+        
+        # JSON駆動アニメーション
         self.animation_speed = self._get_animation_speed()
 
-        self.active = True
-        self.shoot_timer = random.randint(0, self.SHOOT_INTERVAL)  # 発射タイマー
-        
-        # 攻撃ステート関連のプロパティ
-        self.state = ENEMY_STATE_NORMAL  # 敵の現在の状態
-        self.attack_timer = 0           # 攻撃関連のタイマー
-        self.sway_phase = random.uniform(0, 6.28)  # 左右の揺れ位相（ランダム初期値）
-        self.shake_phase_x = random.uniform(0, 6.28)  # 左右身震い位相（ランダム初期値）
-        self.shake_phase_y = random.uniform(0, 6.28)  # 上下身震い位相（ランダム初期値）
-        self.exit_x = x  # 画面外に出た時のX座標を記録
-        
-        # 隊列内位置追跡用（攻撃中でも隊列移動を追跡）
-        self.formation_x = x  # 隊列内での現在のX位置
-        self.formation_y = y  # 隊列内での現在のY位置
-        
-        # 攻撃クールダウン管理
-        self.attack_cooldown_timer = 0  # 攻撃クールダウンタイマー
-
-        # Entry animation properties
-        self.entry_pattern = entry_pattern
-        self.entry_timer = 0
-        self.entry_handler = None
-        if formation_pos and entry_pattern:
-            self.state = ENEMY_STATE_ENTERING
-            self.formation_x, self.formation_y = formation_pos
-            # 隊列判定のためにbase_yを正しく設定
-            self.base_y = self.formation_y
-            
-            # 入場パターンハンドラーを作成
-            self.entry_handler = EntryPatternFactory.create(entry_pattern)
-            
-            # パターンに応じた初期位置を設定
-            initial_x, initial_y = EntryPatternFactory.get_initial_position(entry_pattern)
-            self.x = initial_x
-            self.y = initial_y
-        else:
-            # Default spawn off-screen top
-            self.x = self.formation_x
-            self.y = -16
-
-
-    def update(self, move_amount_x=0):
-        # 攻撃クールダウンタイマーの更新
-        if self.attack_cooldown_timer > 0:
-            self.attack_cooldown_timer -= 1
-
-        # 状態に応じた処理を分岐
-        if self.state == ENEMY_STATE_ENTERING:
-            self._update_entering(move_amount_x)
-        elif self.state == ENEMY_STATE_FORMATION_READY:
-            self._update_formation_ready(move_amount_x)
-        elif self.state == ENEMY_STATE_NORMAL:
-            self._update_normal(move_amount_x)
-        elif self.state == ENEMY_STATE_PREPARE_ATTACK:
-            self._update_prepare_attack(move_amount_x)
-        elif self.state == ENEMY_STATE_ATTACK:
-            self._update_attack(move_amount_x)
-        elif self.state == ENEMY_STATE_RETURNING:
-            self._update_returning(move_amount_x)
-        elif self.state == ENEMY_STATE_DESCENDING:
-            self._update_descending(move_amount_x)
-        elif self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
-            self._update_continuous_attack(move_amount_x)
-
-        # 射撃処理
-        self._update_shooting()
-
-    def _update_entering(self, move_amount_x):
-        """入場アニメーション処理（リファクタリング後）"""
-        if self.entry_handler:
-            # パターンハンドラーに処理を委譲
-            if self.entry_handler.update(self):
-                # 入場パターン完了
-                self.state = ENEMY_STATE_FORMATION_READY
-        else:
-            # デフォルトの直線降下パターン
-            target_x = self.formation_x
-            target_y = self.formation_y
-            
-            # Y軸方向の移動
-            self.y += self.DESCEND_SPEED
-            
-            # X軸方向の移動
-            x_diff = target_x - self.x
-            if abs(x_diff) > 1:
-                self.x += math.copysign(min(abs(x_diff), 2), x_diff)
-            else:
-                self.x = target_x
-            
-            # 到達判定
-            distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-            if distance_to_formation <= self.FORMATION_PROXIMITY or self.y > target_y:
-                self.x = target_x
-                self.y = target_y
-                self.base_x = target_x
-                self.base_y = target_y
-                self.state = ENEMY_STATE_FORMATION_READY
-
-    def _update_formation_ready(self, move_amount_x):
-        """隊列準備完了状態処理"""
-        # Wait for all enemies to be ready
-        pass
-
-    def _update_normal(self, move_amount_x):
-        """通常の隊列移動処理"""
-        # 通常状態：隊列移動（main.pyで処理される）
-        self.x += move_amount_x
-        self.base_x += move_amount_x # base_xも更新
-
-    def _update_prepare_attack(self, move_amount_x):
-        """攻撃準備状態処理"""
-        # 攻撃準備状態：隊列位置キープ＋上下プルプル身震い
-        self.attack_timer += 1
-        
-        # X座標は隊列移動に従う（main.pyで更新される）
-        # Y座標のみ上下プルプル動作
-        self.shake_phase_y += self.PREPARE_SHAKE_FREQUENCY_Y
-        shake_offset_y = math.sin(self.shake_phase_y) * self.PREPARE_SHAKE_AMPLITUDE_Y
-        self.y = self.base_y + shake_offset_y
-        self.x += move_amount_x # グループ移動を反映
-        self.base_x += move_amount_x # base_xも更新
-        
-        # 準備時間が経過したら攻撃状態に移行
-        if self.attack_timer >= self.PREPARE_ATTACK_DURATION:
-            self.state = ENEMY_STATE_ATTACK
-            self.attack_timer = 0  # タイマーリセット
-
-    def _update_attack(self, move_amount_x):
-        """攻撃状態処理"""
-        # 攻撃状態：下方向移動＋フラフラ動作
-        self.attack_timer += 1
-        
-        # 下方向に移動
-        self.y += self.ATTACK_MOVE_SPEED
-        
-        # 左右の揺れ動作
-        self.sway_phase += self.ATTACK_SWAY_FREQUENCY
-        sway_offset = math.sin(self.sway_phase) * self.ATTACK_SWAY_AMPLITUDE
-        self.x = self.base_x + sway_offset + move_amount_x # グループ移動を反映
-        
-        # 画面下に出た場合
-        if self.y > Config.WIN_HEIGHT:
-            # 他のアクティブな敵がいるかチェック
-            other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-            
-            if not other_active_enemies:
-                # 他に敵がいない場合は連続攻撃モードに移行
-                self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-            else:
-                # 他に敵がいる場合は通常の復帰処理
-                self.state = ENEMY_STATE_RETURNING
-            
-            self.attack_timer = 0  # タイマーリセット
-            # 画面外に出た時のX座標を記録
-            self.exit_x = self.x
-            # 画面下の待機位置に移動（プレイヤーの弾が届かない位置）
-            self.y = Config.WIN_HEIGHT + 16
-
-    def _update_returning(self, move_amount_x):
-        """復帰待機状態処理"""
-        # 復帰待機状態（画面下で待機）
-        self.attack_timer += 1
-        
-        # 他のアクティブな敵がいるかチェック
-        other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-        
-        if not other_active_enemies:
-            # 他に敵がいない場合は連続攻撃モードに移行
-            self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-            self.attack_timer = 0  # タイマーリセット
-            return
-        
-        # 画面下の待機位置をキープ（プレイヤーの弾が当たらない）
-        self.y = Config.WIN_HEIGHT + 16
-        self.x = self.exit_x  # 画面外に出た時のX座標で待機
-        self.x += move_amount_x # グループ移動を反映
-        
-        # 復帰時間が経過したら上から復帰降下開始
-        if self.attack_timer >= self.RETURN_DELAY:
-            # 画面外に出た時のX座標で上から復帰
-            self.x = self.exit_x
-            self.y = -16  # 画面上部から開始
-            self.state = ENEMY_STATE_DESCENDING  # 復帰降下状態に移行
-
-    def _update_descending(self, move_amount_x):
-        """復帰降下状態処理"""
-        # 復帰降下状態：元の隊列位置に向かって移動
-        
-        # 他のアクティブな敵がいるかチェック
-        other_active_enemies = [e for e in Common.enemy_list if e.active and e != self]
-        
-        if not other_active_enemies:
-            # 他に敵がいない場合は連続攻撃モードに移行
-            self.state = ENEMY_STATE_CONTINUOUS_ATTACK
-            self.attack_timer = 0  # タイマーリセット
-            return
-        
-        # 下方向に降下
-        self.y += self.DESCEND_SPEED
-        
-        # 現在の隊列位置（formation_x, formation_y）に向かって移動
-        target_x = self.formation_x
-        target_y = self.formation_y
-        
-        # X方向の移動（隊列位置に向かって）
-        x_diff = target_x - self.x
-        if abs(x_diff) > 1:  # まだ離れている場合
-            self.x += math.copysign(min(abs(x_diff), 2), x_diff)  # 最大2ピクセル/フレームで移動
-        else:
-            self.x = target_x  # 十分近づいたら正確な位置に
-        self.x += move_amount_x # グループ移動を反映
-        
-        # 隊列位置に近づいたかチェック
-        distance_to_formation = math.sqrt((self.x - target_x)**2 + (self.y - target_y)**2)
-        if distance_to_formation <= self.FORMATION_PROXIMITY:
-            # 隊列に復帰
-            self.x = target_x
-            self.y = target_y
-            self.base_x = target_x  # base_xも更新
-            self.base_y = target_y  # base_yも更新
-            self.state = ENEMY_STATE_NORMAL  # 通常状態に戻る
-            self.attack_cooldown_timer = self.ATTACK_COOLDOWN  # 攻撃クールダウン開始
-
-    def _update_continuous_attack(self, move_amount_x):
-        """連続攻撃モード処理"""
-        # 連続攻撃モード：最後の敵が永続的に攻撃を続ける
-        self.attack_timer += 1
-        
-        # 画面下の待機位置をキープ（短い時間）
-        self.y = Config.WIN_HEIGHT + 16
-        self.x = self.exit_x  # 画面外に出た時のX座標で待機
-        self.x += move_amount_x # グループ移動を反映
-        
-        # 短い復帰時間が経過したら再び攻撃開始
-        if self.attack_timer >= self.RETURN_DELAY_CONTINUOUS:
-            # ランダムなX座標で上から再出現
-            self.x = random.randint(8, Config.WIN_WIDTH - 16)
-            self.y = -16  # 画面上部から開始
-            self.state = ENEMY_STATE_ATTACK  # 攻撃状態に移行
-            self.attack_timer = 0  # タイマーリセット
-            self.base_x = self.x  # 新しい基準位置を設定
-            self.sway_phase = random.uniform(0, 6.28)  # 揺れ位相をランダム化
-
-    def _update_shooting(self):
-        """射撃処理"""
-        # 発射処理（通常状態と連続攻撃モードの敵）
-        if self.state == ENEMY_STATE_NORMAL or self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
-            self.shoot_timer -= 1
-            if self.shoot_timer <= 0:
-                # 残りの敵の数に応じて発射確率を調整
-                remaining_enemies = len([e for e in Common.enemy_list if e.active])
-                if remaining_enemies > 0:
-                    if self.state == ENEMY_STATE_CONTINUOUS_ATTACK:
-                        # 連続攻撃モードの敵は高い発射確率
-                        shoot_chance = self.MAX_SHOOT_CHANCE
-                    else:
-                        # 通常状態の敵：敵の数が減るほど発射確率が上がる
-                        shoot_chance = min(
-                            self.BASE_SHOOT_CHANCE + (self.BASE_SHOOT_CHANCE * (40 - remaining_enemies) / 40),
-                            self.MAX_SHOOT_CHANCE
-                        )
-                    if random.random() < shoot_chance:  # 確率で発射
-                        Common.enemy_bullet_list.append(
-                            EnemyBullet(self.x + 4, self.y + 8)  # エネミーの中心から発射
-                        )
-                self.shoot_timer = self.SHOOT_INTERVAL
-
+    def update(self):
+        """
+        敵の更新処理
+        隊列移動はmain.pyで一括処理される
+        """
+        if self.state == ENEMY_STATE_NORMAL:
+            self._update_normal()
+    
+    def _update_normal(self):
+        """通常状態の更新処理 - 隊列位置と表示位置を同期"""
+        self.x = self.formation_x
+        self.y = self.formation_y
+    
+    def update_formation_position(self, move_x: float, move_y: float = 0):
+        """
+        隊列位置の更新（main.pyから呼び出される）
+        隊列移動の一元化
+        """
+        self.formation_x += move_x
+        self.formation_y += move_y
+    
+    def is_in_formation(self) -> bool:
+        """隊列にいるかどうかの判定"""
+        return self.state == ENEMY_STATE_NORMAL
+    
+    def get_left_edge(self) -> float:
+        """左端座標を取得"""
+        return self.formation_x
+    
+    def get_right_edge(self) -> float:
+        """右端座標を取得"""
+        return self.formation_x + self.w
+    
     def on_hit(self, bullet):
-        # 弾を消す
+        """弾との衝突処理"""
         bullet.active = False
-        self.Life -= 1
-
-        if self.Life <= 0:
-            self.active = False  # エネミーを非アクティブに
-            # ENEMY_STATE_ENTERING中に破壊された場合は、整列済み扱いとする
-            if self.state == ENEMY_STATE_ENTERING:
-                self.state = ENEMY_STATE_FORMATION_READY
-            # デバッグ出力
-            GameState.debug_print(f"[DEBUG] Enemy destroyed: state={self.state}, active={self.active}")
-            GameState.Score += self.Score  # スコア加算
-            pyxel.play(0, 1)  # 効果音再生
-            Common.explode_manager.spawn_explosion(self.x + 4, self.y + 4, 20, ExpType.RECT)
-            #Common.explode_manager.spawn_explosion(self.x + 4, self.y + 4, 20, ExpType.CIRCLE)
+        self.life -= 1
+        
+        if self.life <= 0:
+            self.active = False
+            GameState.Score += self.score
+            pyxel.play(0, 1)  # 破壊音
+            # 爆発エフェクト
+            if hasattr(Common, 'explode_manager'):
+                from ExplodeManager import ExpType
+                Common.explode_manager.spawn_explosion(self.x + 4, self.y + 4, 20, ExpType.RECT)
         else:
-            self.flash = 6  # 点滅処理
-            Common.explode_manager.spawn_explosion(self.x + 4, self.y + 8, 5, ExpType.DOT_REFRECT)
-            pyxel.play(0, 2)  # 効果音再生
-
+            self.flash = 6  # ヒット点滅
+            pyxel.play(0, 2)  # ヒット音
+            # 小さな爆発エフェクト
+            if hasattr(Common, 'explode_manager'):
+                from ExplodeManager import ExpType
+                Common.explode_manager.spawn_explosion(self.x + 4, self.y + 4, 5, ExpType.DOT_REFRECT)
+    
     def draw(self):
+        """敵の描画処理"""
+        # ヒット時の点滅処理
         if self.flash > 0:
-            # Flash
             for i in range(1, 15):
                 pyxel.pal(i, pyxel.COLOR_WHITE)
-
-        self.flash -= 1
-
-        # JSON駆動のアニメーション計算
-        anim_pat = self._get_animation_frame(pyxel.frame_count)
         
-        # JSON駆動のスプライト取得
-        sprite_idx = self._get_enemy_sprite(anim_pat)
-
+        self.flash = max(0, self.flash - 1)
+        
+        # JSON駆動のアニメーション
+        anim_frame = self._get_animation_frame(pyxel.frame_count)
+        sprite_idx = self._get_enemy_sprite(anim_frame)
+        
+        # スプライト描画
         pyxel.blt(
-            self.x,
-            self.y,
+            int(self.x),
+            int(self.y),
             Config.TILE_BANK0,
             sprite_idx.x,
             sprite_idx.y,
@@ -391,15 +133,21 @@ class Enemy:
             self.h,
             pyxel.COLOR_BLACK,
         )
-
-        pyxel.pal()
-
-        # Collision Box
+        
+        pyxel.pal()  # パレットリセット
+        
+        # デバッグ用当たり判定表示
         if Config.DEBUG:
-            pyxel.rectb(self.x + self.col_x, self.y + self.col_y, self.col_w, self.col_h, pyxel.COLOR_RED)
-    
-    def _get_animation_speed(self):
-        """JSONからエネミーアニメーション速度を取得する"""
+            pyxel.rectb(
+                int(self.x + self.col_x), 
+                int(self.y + self.col_y), 
+                self.col_w, 
+                self.col_h, 
+                pyxel.COLOR_RED
+            )
+
+    def _get_animation_speed(self) -> int:
+        """JSONからアニメーション速度を取得"""
         enemy_name = f"ENEMY{self.sprite_num:02d}"
         anim_spd = sprite_manager.get_sprite_metadata(enemy_name, "ANIM_SPD", "10")
         try:
@@ -407,11 +155,82 @@ class Enemy:
         except (ValueError, TypeError):
             return 10  # デフォルト値
     
-    def _get_animation_frame(self, frame_count):
-        """フレームカウントに基づいてアニメーションフレームを計算する"""
-        return frame_count // self.animation_speed % 4  # 0～3でぐるぐる
+    def _get_animation_frame(self, frame_count: int) -> int:
+        """アニメーションフレーム計算"""
+        return frame_count // self.animation_speed % 4  # 4フレーム循環
     
-    def _get_enemy_sprite(self, anim_pat):
-        """エネミーのスプライトを取得する"""
+    def _get_enemy_sprite(self, anim_frame: int):
+        """JSON駆動のスプライト取得"""
         enemy_name = f"ENEMY{self.sprite_num:02d}"
-        return sprite_manager.get_sprite_by_name_and_field(enemy_name, "FRAME_NUM", str(anim_pat % 4))
+        return sprite_manager.get_sprite_by_name_and_field(enemy_name, "FRAME_NUM", str(anim_frame % 4))
+
+
+class FormationManager:
+    """
+    隊列移動の一元管理クラス
+    FormationIssue.mdの提案を実装
+    """
+    
+    MOVE_SPEED = 0.7        # 隊列移動速度（少し高速化）
+    MOVE_THRESHOLD = 1.0    # 移動閾値
+    
+    def __init__(self):
+        self.move_direction = 1         # 1=右, -1=左
+        self.accumulated_movement = 0.0  # 累積移動量
+    
+    def update(self, enemy_list):
+        """
+        隊列移動の更新処理
+        main.pyから呼び出される
+        """
+        # アクティブで隊列にいる敵のみを対象
+        formation_enemies = [e for e in enemy_list if e.active and e.is_in_formation()]
+        
+        if not formation_enemies:
+            return
+        
+        # 累積移動量を更新
+        self.accumulated_movement += self.MOVE_SPEED * self.move_direction
+        
+        # 閾値を超えたら実際に移動
+        if abs(self.accumulated_movement) >= self.MOVE_THRESHOLD:
+            move_amount = int(self.accumulated_movement)
+            self.accumulated_movement -= move_amount
+            
+            # 方向転換チェック（移動前に実行）
+            self._check_direction_change(formation_enemies)
+            
+            # デバッグ出力（移動時のみ）
+            if Config.DEBUG:
+                leftmost = min(e.get_left_edge() for e in formation_enemies)
+                rightmost = max(e.get_right_edge() for e in formation_enemies)
+                print(f"[FormationManager] Moving {move_amount}px, direction={self.move_direction}, enemies={len(formation_enemies)}, range=[{leftmost:.1f}-{rightmost:.1f}]")
+            
+            # 全ての隊列敵の位置を一括更新
+            for enemy in formation_enemies:
+                enemy.update_formation_position(move_amount)
+    
+    def _check_direction_change(self, formation_enemies):
+        """端の敵の位置を監視して方向転換"""
+        if not formation_enemies:
+            return
+        
+        # 隊列の端点を取得
+        leftmost_x = min(e.get_left_edge() for e in formation_enemies)
+        rightmost_x = max(e.get_right_edge() for e in formation_enemies)
+        
+        # 方向転換判定（少し余裕を持たせる）
+        old_direction = self.move_direction
+        MARGIN = 2  # 画面端から2ピクセル手前で方向転換
+        if self.move_direction == 1 and rightmost_x >= Config.WIN_WIDTH - MARGIN:
+            self.move_direction = -1  # 左へ
+        elif self.move_direction == -1 and leftmost_x <= MARGIN:
+            self.move_direction = 1   # 右へ
+        
+        # 方向転換のデバッグ出力
+        if Config.DEBUG and old_direction != self.move_direction:
+            print(f"[FormationManager] Direction changed: {old_direction} -> {self.move_direction}, leftmost={leftmost_x:.1f}, rightmost={rightmost_x:.1f}")
+
+
+# グローバルな隊列管理インスタンス
+formation_manager = FormationManager()

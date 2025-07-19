@@ -12,13 +12,14 @@
 
 import pyxel
 import random
+import os
 
 import Common
 import Config
 import GameState
 # from SpriteManager import SprList  # No longer needed
 from StageManager import get_current_stage_map, check_stage_clear
-from Enemy import Enemy
+from Enemy import Enemy, formation_manager
 from ExplodeManager import ExpType
 
 from StarManager import StarManager
@@ -61,34 +62,12 @@ def update_playing(self):
 
     # --- 敵の移動処理（戦闘中のみ） ---
     if GameState.GameStateSub == Config.STATE_PLAYING_FIGHT:
-        # グループ移動の更新
-        GameState.enemy_group_x += Enemy.MOVE_SPEED * GameState.enemy_move_direction
-        
-        # 移動量が閾値を超えたら整数値で移動
-        if abs(GameState.enemy_group_x) >= Enemy.MOVE_THRESHOLD:
-            move_amount = int(GameState.enemy_group_x)
-            GameState.enemy_group_x -= move_amount
-            
-            # 画面端での方向転換チェック
-            formation_enemies = [e for e in Common.enemy_list if e.active and (e.state == 0 or e.state == 1)]
-            if formation_enemies:
-                if GameState.enemy_move_direction == GameState.ENEMY_MOVE_RIGHT:
-                    # 右端のエネミーを探す
-                    rightmost_x = max(enemy.base_x for enemy in formation_enemies)
-                    if rightmost_x + 8 >= Config.WIN_WIDTH:  # 8はエネミーの幅
-                        GameState.enemy_move_direction = GameState.ENEMY_MOVE_LEFT
-                else:
-                    # 左端のエネミーを探す
-                    leftmost_x = min(enemy.base_x for enemy in formation_enemies)
-                    if leftmost_x <= 0:
-                        GameState.enemy_move_direction = GameState.ENEMY_MOVE_RIGHT
+        # 新しいFormationManagerで隊列移動を処理
+        formation_manager.update(Common.enemy_list)
 
-        # 攻撃ステート選択の更新
-        Common.update_enemy_attack_selection()
-
-    # 各敵のupdateを呼び出す (ヒットストップ中も状態遷移は進める)
+    # 各敵のupdateを呼び出す（シンプル化）
     for _e in Common.enemy_list:
-        _e.update(move_amount)
+        _e.update()
 
     #ゲームスタート時の敵スポーン処理（ウェーブキューシステム）
     if GameState.GameStateSub == Config.STATE_PLAYING_ENEMY_ENTRY:
@@ -128,13 +107,8 @@ def update_playing(self):
                     enemy_x = OFSX + (BASEX * _x)
                     sprite_num = get_current_stage_map()[_y][_x]
                     
-                    # パターン設定
-                    if _y == 0:  # 1行目だけジグザグパターン
-                        pattern = 3
-                    else:
-                        pattern = 1 if _x < 5 else 2
-
-                    _Enemy = Enemy(0, 0, 8, 8, 2, 100, sprite_num, formation_pos=(enemy_x, enemy_y), entry_pattern=pattern)
+                    # シンプルな敵生成（新しいコンストラクタに合わせる）
+                    _Enemy = Enemy(x=enemy_x, y=enemy_y, sprite_num=sprite_num, w=8, h=8, life=2, score=100)  # 通常の体力に戻す
                     Common.enemy_list.append(_Enemy)
                     
                     wave["spawn_index"] += 1
@@ -145,15 +119,13 @@ def update_playing(self):
             
             # 入場中のウェーブの完了チェック
             elif state == 2:  # ENTERING
-                # 現在の行の全敵がFORMATION_READYになったかチェック
-                current_row_enemies = [e for e in Common.enemy_list if e.active and 
-                                     e.base_y == OFSY + (BASEY * row)]
-                ready_enemies = [e for e in current_row_enemies if e.state == -2]
+                # 現在の行の全敵の簡易チェック（新Enemy.py用）
+                current_row_enemies = [e for e in Common.enemy_list if e.active]
+                ready_enemies = current_row_enemies  # 新Enemy.pyでは即座にready状態
                 
-                # デバッグ情報
+                # デバッグ情報（新Enemy.py用）
                 if Config.DEBUG and len(current_row_enemies) > 0:
-                    entering_enemies = [e for e in current_row_enemies if e.state == -1]
-                    print(f"Wave {row}: Total={len(current_row_enemies)}, Entering={len(entering_enemies)}, Ready={len(ready_enemies)}")
+                    print(f"Wave {row}: Total={len(current_row_enemies)}, Ready={len(ready_enemies)}")
                 
                 # 入場完了判定
                 if len(ready_enemies) == len(current_row_enemies) and len(current_row_enemies) > 0:
@@ -169,25 +141,22 @@ def update_playing(self):
         # 全ウェーブ完了チェック
         all_completed = all(wave["state"] == 3 for wave in self.wave_queue)
         if all_completed:
-            # 全隊列の出現・入場完了、戦闘開始
-            active_ready = [e for e in Common.enemy_list if e.active and e.state == -2]
+            # 全隊列の出現・入場完了、戦闘開始（新Enemy.py用）
             active_count = len([e for e in Common.enemy_list if e.active])
             if active_count == 0:
                 # 全員倒された場合は即クリア判定へ
                 GameState.GameStateSub = Config.STATE_PLAYING_STAGE_CLEAR
-                del self.spawn_timer
-                del self.spawn_index
-                del self.wave_queue
-            elif active_count > 0 and len(active_ready) == active_count:
-                # activeな敵だけNORMALへ遷移
-                for enemy in Common.enemy_list:
-                    if enemy.active and enemy.state == -2:
-                        enemy.state = 0 # ENEMY_STATE_NORMAL
-                        enemy.attack_cooldown_timer = random.randint(0, 300)
-                del self.spawn_timer
-                del self.spawn_index
-                del self.wave_queue
+            else:
+                # 戦闘開始（新Enemy.pyでは状態管理なし）
                 GameState.GameStateSub = Config.STATE_PLAYING_FIGHT
+            
+            # クリーンアップ
+            if hasattr(self, 'spawn_timer'):
+                del self.spawn_timer
+            if hasattr(self, 'spawn_index'):
+                del self.spawn_index
+            if hasattr(self, 'wave_queue'):
+                del self.wave_queue
 
     # 星の背景アニメーションは常に更新（ヒットストップの影響を受けない）
     self.star_manager.update()
@@ -315,6 +284,15 @@ class App:
 
         GameState.Score = 10
         GameState.HighScore = 100
+
+        # デバッグログファイルの初期化
+        if Config.DEBUG:
+            # 既存のログファイルを削除
+            if os.path.exists("debug_enemy.log"):
+                os.remove("debug_enemy.log")
+            # 新しいログファイルを作成
+            with open("debug_enemy.log", "w") as f:
+                f.write("=== Enemy Debug Log Started ===\n")
 
         pyxel.run(self.update, self.draw)
         

@@ -8,6 +8,7 @@ import Config
 import GameState
 from SpriteManager import sprite_manager
 from EntryPatterns import EntryPatternFactory
+from EnemyBullet import EnemyBullet
 import random
 import math
 
@@ -23,6 +24,11 @@ class Enemy:
     # Constants
     MOVE_SPEED = 0.5                    # 隊列移動速度
     COLLISION_BOX = (1, 1, 6, 6)       # 当たり判定ボックス
+    
+    # Shooting Constants
+    SHOOT_INTERVAL = 60                 # 射撃間隔（1秒）
+    BASE_SHOOT_CHANCE = 0.10           # 基本射撃確率（10%）
+    MAX_SHOOT_CHANCE = 0.30            # 最大射撃確率（30%）
     
     def __init__(self, x: float, y: float, sprite_num: int = 1, w: int = 8, h: int = 8, life: int = 1, score: int = 10, entry_pattern: str = None, entry_y: float = None, wave_id: int = -1, enemy_index: int = -1, entry_pattern_id: int = None):
         """
@@ -107,6 +113,9 @@ class Enemy:
         # JSON駆動アニメーション
         self.animation_speed = self._get_animation_speed()
         
+        # 射撃システム
+        self.shoot_timer = random.randint(0, self.SHOOT_INTERVAL)  # 射撃タイマー（ランダム初期値）
+        
         # 初期状態をログ出力
         if Config.DEBUG and (self.enemy_index == 0 or self.enemy_index == 9):  # 最初と最後の敵のみ
             print(f"[{self.enemy_id}] Created: state={self.state}, pattern={self.entry_pattern_str}, entry_y={getattr(self, 'entry_y', 'N/A')}")
@@ -138,6 +147,10 @@ class Enemy:
             self._update_home_reached()
         elif self.state == ENEMY_STATE_NORMAL:
             self._update_normal()
+        
+        # 射撃処理（隊列移動中のみ）
+        if self.state == ENEMY_STATE_NORMAL:
+            self._update_shooting()
     
     def _update_entry_sequence(self):
         """登場シーケンス処理 - EntryPattern統合版"""
@@ -314,6 +327,34 @@ class Enemy:
         """JSON駆動のスプライト取得"""
         enemy_name = f"ENEMY{self.sprite_num:02d}"
         return sprite_manager.get_sprite_by_name_and_field(enemy_name, "FRAME_NUM", str(anim_frame % 4))
+    
+    def _update_shooting(self):
+        """
+        射撃処理 - 隊列移動中の敵機射撃システム
+        EnemyOld.pyの射撃ロジックを移植
+        """
+        self.shoot_timer -= 1
+        if self.shoot_timer <= 0:
+            # 残りの敵の数を取得
+            remaining_enemies = len([e for e in Common.enemy_list if e.active])
+            if remaining_enemies > 0:
+                # 敵の数が減るほど射撃確率が上がる
+                shoot_chance = min(
+                    self.BASE_SHOOT_CHANCE + (self.BASE_SHOOT_CHANCE * (40 - remaining_enemies) / 40),
+                    self.MAX_SHOOT_CHANCE
+                )
+                
+                if random.random() < shoot_chance:
+                    # 敵弾を発射（敵の中心から）
+                    bullet_x = self.x + 4
+                    bullet_y = self.y + 8
+                    Common.enemy_bullet_list.append(EnemyBullet(bullet_x, bullet_y))
+                    
+                    if Config.DEBUG:
+                        print(f"[{self.enemy_id}] Shot fired! Chance: {shoot_chance:.2f}, Remaining: {remaining_enemies}")
+            
+            # 射撃タイマーをリセット
+            self.shoot_timer = self.SHOOT_INTERVAL
 
 
 class FormationManager:

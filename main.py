@@ -211,6 +211,10 @@ def update_playing(self):
     self.star_manager.update()
 
     # ステージクリア時の処理
+    # プレイヤーの更新処理（ステージクリア中でも移動可能にする）
+    if GameState.StopTimer <= 0:  # ヒットストップ中以外は常に更新
+        self.player.update()
+
     if GameState.GameStateSub == Config.STATE_PLAYING_STAGE_CLEAR:
         if pyxel.btn(pyxel.KEY_Z):
             GameState.CURRENT_STAGE += 1
@@ -223,7 +227,6 @@ def update_playing(self):
     if GameState.StopTimer > 0:
         GameState.StopTimer -= 1
         return
-    self.player.update()
 
     # --- 衝突判定：プレイヤー弾 vs 敵 ---
     for bullet in Common.player_bullet_list:
